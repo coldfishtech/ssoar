@@ -436,15 +436,14 @@
   let clouds = [];
   let standingOnCloud = false; // frame flag for rendering micro-overlap
 
-    // -------- difficulty / level --------
+    // -------- difficulty (static) --------
   let MAX_CLOUD_SPACING = 150;
   let BASE_CLOUD_SPEED = 1.2;
-    let level = 1;
-  // (reverted) no additional spacing control constants
 
 
-    // level-up popup
-    let levelUpPopup = null;
+  // milestone popup (every 1000 score)
+  let milestonePopup = null;
+  let nextMilestone = 1000;
 
     // restart cooldown (ms)
     let restartCooldown = 0;
@@ -746,7 +745,7 @@
       player.dx = 0; player.dy = 0; player.canJump = true;
 
   score = 0; gameRunning = true; bgOffset = 0; paused = false;
-      MAX_CLOUD_SPACING = 150; BASE_CLOUD_SPEED = 1.2; level = 1; levelUpPopup = null;
+  MAX_CLOUD_SPACING = 150; BASE_CLOUD_SPEED = 1.2; milestonePopup = null; nextMilestone = 1000;
 
       restartCooldown = 200;
       spaceHeld = false;
@@ -757,17 +756,7 @@
       gameOverSFXPlayed = false;
     }
 
-    function updateDifficulty() {
-      const newLevel = Math.floor(score / 1000) + 1;
-      if (newLevel !== level) {
-        level = newLevel;
-  levelUpPopup = { text: "LEVEL UP!", levelNumber: newLevel, y: 72, alpha: 0.5 };
-        // uplifting chime
-        playLevelUpSFX();
-      }
-      BASE_CLOUD_SPEED = 1.2 + (level-1) * 0.4;
-      MAX_CLOUD_SPACING = 150 + (level-1) * 20;
-    }
+  // Difficulty ramps with score thresholds (every 1000 points), without levels UI
 
     function update(dt) {
       if (!gameRunning) {
@@ -885,7 +874,16 @@
 
         bgOffset = (bgOffset + diff/2);
         score += Math.floor(diff);
-        updateDifficulty();
+        // Trigger milestone popup for every 1000 points crossed
+        while (score >= nextMilestone) {
+          milestonePopup = { scoreNumber: nextMilestone, y: 72, alpha: 0.5 };
+          playLevelUpSFX();
+          nextMilestone += 1000;
+        }
+        // Difficulty scaling (same as previous level thresholds)
+        const levelIndex = Math.floor(score / 1000); // 0 at 0..999, 1 at 1000..1999, etc.
+        BASE_CLOUD_SPEED = 1.2 + (levelIndex) * 0.4;
+        MAX_CLOUD_SPACING = 150 + (levelIndex) * 20;
       }
 
       for (let cloud of clouds) {
@@ -912,10 +910,10 @@
         }
       }
 
-      if (levelUpPopup) {
-  levelUpPopup.y -= 1;
-        levelUpPopup.alpha -= 0.02;
-        if (levelUpPopup.alpha <= 0) levelUpPopup = null;
+      if (milestonePopup) {
+        milestonePopup.y -= 1;
+        milestonePopup.alpha -= 0.02;
+        if (milestonePopup.alpha <= 0) milestonePopup = null;
       }
       updateParticles(delta);
     }
@@ -1017,17 +1015,16 @@
     }
     function drawHUD() {
       ctx.fillStyle = "#000";
-      ctx.font = `16px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Score: " + Math.floor(score), 10, 22);
-      // Right-align the Level label to always fit within the canvas
-      ctx.textAlign = 'right';
-      ctx.fillText("Level: " + level, canvas.width - 10, 22);
+      // Draw just the score number, twice as big as before (32px)
+      ctx.font = `32px ${FONT_STACK_BOLD}`;
       ctx.textAlign = 'left';
+      ctx.fillText(String(Math.floor(score)), 10, 30);
+      // Add margin before Best line (reduced spacing)
       ctx.font = `12px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Best: " + Math.floor(bestScore), 10, 38);
-      // show pause indicator subtly
+      ctx.fillText("Best: " + Math.floor(bestScore), 10, 44);
+      // show pause indicator subtly below Best
       ctx.font = `12px ${FONT_STACK_BOLD}`;
-      if (paused) ctx.fillText("[Paused]", 10, 40);
+      if (paused) ctx.fillText("[Paused]", 10, 60);
     }
     // drawTouchControls removed
     function drawGameOver() {
@@ -1036,14 +1033,17 @@
       ctx.fillStyle = "#fff";
       ctx.textAlign = "center";
       ctx.font = `36px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Game Over", canvas.width/2, canvas.height/2 - 20);
-      ctx.font = `20px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Score: " + Math.floor(score), canvas.width/2, canvas.height/2 + 8);
-      ctx.fillText("Level: " + level, canvas.width/2, canvas.height/2 + 32);
-      ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, canvas.height/2 + 56);
+    ctx.fillText("Game Over", canvas.width/2, canvas.height/2 - 20);
+  // Show only the score number, 1.5x larger than before (30px)
+  ctx.font = `30px ${FONT_STACK_BOLD}`;
+  // Equalize vertical spacing: title→score and score→best both 36px; slightly reduce title→score
+  ctx.fillText(String(Math.floor(score)), canvas.width/2, canvas.height/2 + 16);
+  // Move Best slightly further down to keep spacing from the larger score
+  ctx.font = `20px ${FONT_STACK_BOLD}`;
+  ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, canvas.height/2 + 52);
 
       const btnW=110, btnH=44;
-      const btnX=canvas.width/2-btnW/2, btnY=canvas.height/2+72;
+  const btnX=canvas.width/2-btnW/2, btnY=canvas.height/2+72;
       ctx.fillStyle="#222"; ctx.fillRect(btnX, btnY, btnW, btnH);
       ctx.fillStyle="#fff"; ctx.font=`20px ${FONT_STACK_BOLD}`;
       ctx.fillText("Restart", canvas.width/2, btnY+btnH/2+7);
@@ -1086,17 +1086,17 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       drawHUD();
 
-      if (levelUpPopup) {
-        ctx.fillStyle = `rgba(0, 0, 0, ${levelUpPopup.alpha})`;
+      if (milestonePopup) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${milestonePopup.alpha})`;
         ctx.textAlign = "center";
         const headlineSize = 28;
         ctx.font = `${headlineSize}px ${FONT_STACK_BOLD}`;
-        ctx.fillText(levelUpPopup.text, canvas.width/2, levelUpPopup.y);
+        ctx.fillText("SCORE", canvas.width/2, milestonePopup.y);
         const numberSize = 132;
         ctx.font = `${numberSize}px ${FONT_STACK_BOLD}`;
-        const sub = String(levelUpPopup.levelNumber ?? level);
+        const sub = String(milestonePopup.scoreNumber);
         const numberOffset = Math.max(110, Math.round(numberSize * 0.9));
-        ctx.fillText(sub, canvas.width/2, levelUpPopup.y + numberOffset);
+        ctx.fillText(sub, canvas.width/2, milestonePopup.y + numberOffset);
         ctx.textAlign = "left";
       }
 
