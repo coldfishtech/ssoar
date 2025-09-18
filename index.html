@@ -368,9 +368,12 @@
       canJump: true
     };
 
-    // -------- clouds --------
-    const cloudWidth = 64, cloudHeight = 16;
-    let clouds = [];
+  // -------- clouds --------
+  const cloudWidth = 64, cloudHeight = 16;
+  const CLOUD_TOP_RISE = 6; // visual top cap rises above base by 6px
+  const CLOUD_OVERLAP_DRAW = 1; // draw player 1px into cloud for micro-overlap
+  let clouds = [];
+  let standingOnCloud = false; // frame flag for rendering micro-overlap
 
     // -------- difficulty / level --------
   let MAX_CLOUD_SPACING = 150;
@@ -750,14 +753,15 @@
       }
 
       for (let cloud of clouds) {
+        const surfaceY = cloud.y - CLOUD_TOP_RISE; // use visual top as landing surface
         if (
-          currBottom >= cloud.y &&
-          prevBottom <= cloud.y &&
+          currBottom >= surfaceY &&
+          prevBottom <= surfaceY &&
           (player.x + player.width) > cloud.x &&
           player.x < cloud.x + cloud.width
         ) {
           player.dy = 0;
-          player.y = cloud.y - player.height;
+          player.y = surfaceY - player.height;
           player.canJump = true;
           onCloud = cloud;
           if (!wasCanJump) beep(220, 60, "sine", 0.03); // land SFX
@@ -770,6 +774,9 @@
         if (player.x < 0) player.x = 0;
         if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
       }
+
+      // Track for rendering micro-overlap
+      standingOnCloud = !!onCloud;
 
       // Update coyote/jump buffer timers
       if (player.canJump) {
@@ -844,7 +851,7 @@
       // Original simple two-rectangle cloud with a single outer stroke around the combined shape
       ctx.fillStyle = "#fff";
       ctx.fillRect(cloud.x, cloud.y, cloud.width, cloud.height);
-      ctx.fillRect(cloud.x + 4, cloud.y - 6, cloud.width - 8, cloud.height);
+      ctx.fillRect(cloud.x + 4, cloud.y - CLOUD_TOP_RISE, cloud.width - 8, cloud.height);
 
       const x = cloud.x, y = cloud.y, w = cloud.width, h = cloud.height;
       ctx.beginPath();
@@ -852,8 +859,8 @@
       ctx.moveTo(x, y + h);                // bottom-left
       ctx.lineTo(x, y);                    // up left edge to top of base
       ctx.lineTo(x + 4, y);                // to start of top rect inset
-      ctx.lineTo(x + 4, y - 6);            // up to top rect top edge
-      ctx.lineTo(x + w - 4, y - 6);        // across top edge of top rect
+  ctx.lineTo(x + 4, y - CLOUD_TOP_RISE);            // up to top rect top edge
+  ctx.lineTo(x + w - 4, y - CLOUD_TOP_RISE);        // across top edge of top rect
       ctx.lineTo(x + w - 4, y);            // down to top of base at right inset
       ctx.lineTo(x + w, y);                // to right edge
       ctx.lineTo(x + w, y + h);            // down to bottom-right
@@ -928,10 +935,11 @@
       ctx.fillRect(ground.x, ground.y, ground.width, 3);
     }
     function drawPlayer() {
+      const yOff = standingOnCloud ? CLOUD_OVERLAP_DRAW : 0;
       ctx.fillStyle = "#000000";
-      ctx.fillRect(player.x, player.y, player.width, player.height);
+      ctx.fillRect(player.x, player.y + yOff, player.width, player.height);
       ctx.fillStyle = "#000000";
-      ctx.fillRect(player.x+8, player.y+8, 16, 16);
+      ctx.fillRect(player.x+8, player.y+8 + yOff, 16, 16);
     }
     function drawHUD() {
       ctx.fillStyle = "#000";
