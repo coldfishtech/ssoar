@@ -139,6 +139,8 @@
       }
       #titleImage, #musicbar, #controls { width: 100%; max-width: 100%; box-sizing: border-box; }
       #musicbar { box-sizing: border-box; padding: 0 12px; }
+      /* Increase separation between arrow group and jump button */
+      #controls { gap: 80px; }
       /* Canvas width will be set via JS; fallback respects body padding */
       canvas { width: 100%; height: auto; }
     }
@@ -175,6 +177,11 @@
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+  // Render-time zoom (uniform) — apply only on mobile
+  const CAMERA_ZOOM = 1.5; // show ~1.5x more (zoom out)
+  function getDrawScale() { return IS_TOUCH ? (1 / CAMERA_ZOOM) : 1; }
+  function viewWidth() { return canvas.width / getDrawScale(); }
+  function viewHeight() { return canvas.height / getDrawScale(); }
     // Determine mobile/desktop purely by viewport width (matching the CSS breakpoint)
     function computeIsMobile() {
       const vw = (window.visualViewport?.width || window.innerWidth);
@@ -225,10 +232,10 @@
         canvas.height = logicalH;
         // Reset any transforms after resize
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        // Ensure ground spans the new canvas width
+        // Ensure ground spans the new world width (accounts for zoom)
         if (ground) {
           ground.x = 0;
-          ground.width = canvas.width;
+          ground.width = viewWidth();
         }
       }
     }
@@ -348,6 +355,8 @@
         if (!scReady) return;
         // Toggle desired state, but update UI only when widget confirms via events
         desiredPlaying = !desiredPlaying;
+        // Attempt to unlock audio (user gesture)
+        unlockAudioOnce();
         try {
           if (desiredPlaying) scWidget.play(); else scWidget.pause();
         } catch(e) {}
@@ -467,14 +476,25 @@
     }
     // Basic AudioContext SFX
     let audioCtx = null;
+    let audioUnlocked = false;
     function ensureAudio() {
       if (!audioCtx) {
         try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
       }
     }
+    function unlockAudioOnce() {
+      ensureAudio();
+      if (audioCtx && audioCtx.state !== 'running') {
+        try { audioCtx.resume().catch(()=>{}); } catch(e) {}
+      }
+      audioUnlocked = true;
+    }
     function beep(freq = 440, durMs = 100, type = "sine", gain = 0.05) {
       ensureAudio();
       if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') {
+        try { audioCtx.resume().catch(()=>{}); } catch(e) {}
+      }
       const osc = audioCtx.createOscillator();
       const g = audioCtx.createGain();
       osc.type = type; osc.frequency.value = freq;
@@ -505,17 +525,19 @@
       const stripeHeight = 32;
       // Subtle cool near-white palette (very light blue/grey)
       const colors = ["#f4f8fc", "#f1f6fb", "#eef4f9", "#f1f6fb"];
-      const total = Math.ceil(canvas.height / stripeHeight) + 2;
+      const h = viewHeight();
+      const w = viewWidth();
+      const total = Math.ceil(h / stripeHeight) + 2;
       for (let i = 0; i < total; i++) {
         const y = (i * stripeHeight + (bgOffset % (stripeHeight * colors.length) + stripeHeight * colors.length)) % (stripeHeight * colors.length);
         ctx.fillStyle = colors[i % colors.length];
-        ctx.fillRect(0, y, canvas.width, stripeHeight);
+        ctx.fillRect(0, y, w, stripeHeight);
       }
     }
 
     function createCloud(y) {
       return {
-        x: Math.random() * (canvas.width - cloudWidth),
+        x: Math.random() * (viewWidth() - cloudWidth),
         y,
         width: cloudWidth,
         height: cloudHeight,
@@ -698,11 +720,11 @@
 
     function restartGame() {
       ground.x = 0;
-      ground.y = canvas.height - groundHeight;
-      ground.width = canvas.width;
+      ground.y = viewHeight() - groundHeight;
+      ground.width = viewWidth();
       groundActive = true;
 
-      player.x = canvas.width/2 - player.width/2;
+      player.x = viewWidth()/2 - player.width/2;
       player.y = ground.y - player.height;
       player.dx = 0; player.dy = 0; player.canJump = true;
 
@@ -767,8 +789,8 @@
       player.x += player.dx * step;
       player.y += player.dy * step;
 
-      if (player.x < 0) player.x = 0;
-      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+  if (player.x < 0) player.x = 0;
+  if (player.x + player.width > viewWidth()) player.x = viewWidth() - player.width;
 
       const currBottom = player.y + player.height;
       const wasCanJump = player.canJump;
@@ -803,7 +825,7 @@
       if (onCloud) {
         player.x += onCloud.dx * step;
         if (player.x < 0) player.x = 0;
-        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        if (player.x + player.width > viewWidth()) player.x = viewWidth() - player.width;
       }
 
       // Track for rendering micro-overlap
@@ -823,13 +845,13 @@
         jumpBufferTimer = Math.max(0, jumpBufferTimer - delta);
       }
 
-      if (player.y < canvas.height / 2) {
-        const diff = (canvas.height / 2) - player.y;
-        player.y = canvas.height / 2;
+      if (player.y < viewHeight() / 2) {
+        const diff = (viewHeight() / 2) - player.y;
+        player.y = viewHeight() / 2;
 
         for (let i = 0; i < clouds.length; i++) {
           clouds[i].y += diff;
-          if (clouds[i].y > canvas.height) {
+          if (clouds[i].y > viewHeight()) {
             clouds.splice(i, 1);
             const newY = -cloudHeight - Math.random()*40;
             clouds.push(createCloud(newY));
@@ -839,7 +861,7 @@
 
         if (groundActive) {
           ground.y += diff;
-          if (ground.y > canvas.height + groundHeight) groundActive = false;
+          if (ground.y > viewHeight() + groundHeight) groundActive = false;
         }
 
         bgOffset = (bgOffset + diff/2);
@@ -854,13 +876,13 @@
         if (cloud.x < 0) {
           cloud.x = 0;
           cloud.dx = Math.abs(cloud.dx);
-        } else if (right > canvas.width) {
-          cloud.x = canvas.width - cloud.width;
+        } else if (right > viewWidth()) {
+          cloud.x = viewWidth() - cloud.width;
           cloud.dx = -Math.abs(cloud.dx);
         }
       }
 
-      if (player.y > canvas.height) {
+      if (player.y > viewHeight()) {
         if (!gameOverSFXPlayed) { playGameOverSFX(); gameOverSFXPlayed = true; }
         gameRunning = false;
         if (score > bestScore) {
@@ -954,16 +976,16 @@
       if (!groundActive) return;
       // fill with dark concrete base
       ctx.fillStyle = '#3f444b';
-      ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+      ctx.fillRect(0, ground.y, viewWidth(), ground.height);
       // overlay cracks pattern
       ctx.save();
       ctx.globalAlpha = 0.55;
       ctx.fillStyle = getConcretePattern();
-      ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+      ctx.fillRect(0, ground.y, viewWidth(), ground.height);
       ctx.restore();
       // subtle top highlight to separate from air
       ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.fillRect(ground.x, ground.y, ground.width, 3);
+      ctx.fillRect(0, ground.y, viewWidth(), 3);
     }
     function drawPlayer() {
       const yOff = standingOnCloud ? CLOUD_OVERLAP_DRAW : 0;
@@ -1015,28 +1037,45 @@
     }
 
     function draw() {
+      // Clear in pixel space
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Compute world camera to keep the ground anchored to the pixel bottom
+    const s = getDrawScale();
+    const vw = viewWidth();
+    const vh = viewHeight();
+    // Align world x=0 to the left edge so the ground spans the visible width
+    const camX = 0;
+      const groundBottomWorld = ground.y + ground.height;
+      const camY = groundBottomWorld - vh;  // place ground bottom at pixel bottom
+
+      // Apply world transform (scale then translate in world units)
+      ctx.setTransform(s, 0, 0, s, 0, 0);
+      ctx.translate(-camX, -camY);
+
+      // World rendering
       drawScrollingSky();
       for (let cloud of clouds) drawCloud(cloud);
       drawGround();
-  drawPlayer();
-  drawParticles();
-    drawHUD();
+      drawPlayer();
+      drawParticles();
+
+      // Reset to pixel space for HUD/overlays (keeps UI crisp and stable)
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      drawHUD();
 
       if (levelUpPopup) {
         ctx.fillStyle = `rgba(0, 0, 0, ${levelUpPopup.alpha})`;
         ctx.textAlign = "center";
-        // Headline: half the previous size (28px)
         const headlineSize = 28;
         ctx.font = `${headlineSize}px ${FONT_STACK_BOLD}`;
         ctx.fillText(levelUpPopup.text, canvas.width/2, levelUpPopup.y);
-  // Number: three times bigger than before (44px * 3 = 132px)
-  const numberSize = 132;
-  ctx.font = `${numberSize}px ${FONT_STACK_BOLD}`;
-  const sub = String(levelUpPopup.levelNumber ?? level);
-  // Increase spacing: base it on the number size so it scales well
-  const numberOffset = Math.max(110, Math.round(numberSize * 0.9));
-  ctx.fillText(sub, canvas.width/2, levelUpPopup.y + numberOffset);
+        const numberSize = 132;
+        ctx.font = `${numberSize}px ${FONT_STACK_BOLD}`;
+        const sub = String(levelUpPopup.levelNumber ?? level);
+        const numberOffset = Math.max(110, Math.round(numberSize * 0.9));
+        ctx.fillText(sub, canvas.width/2, levelUpPopup.y + numberOffset);
         ctx.textAlign = "left";
       }
 
@@ -1057,6 +1096,11 @@
       sizeCanvasToViewport();
       initMusic();
       setupInputUI();
+      // Unlock WebAudio on first user interaction so SFX can play even if BGM stays off
+      const unlockers = ['pointerdown', 'touchstart', 'keydown'];
+      unlockers.forEach(ev => {
+        window.addEventListener(ev, unlockAudioOnce, { once: true, passive: ev !== 'keydown' });
+      });
       restartGame();
       requestAnimationFrame(frame);
     }
