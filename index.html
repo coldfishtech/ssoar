@@ -129,7 +129,14 @@
 
     /* Mobile-friendly layout: let elements span full width and canvas fill viewport remainder */
     @media (max-width: 600px) {
-      body { align-items: stretch; justify-content: flex-start; padding: 24px; }
+      body {
+        align-items: stretch;
+        justify-content: flex-start;
+        padding: 24px;
+        /* Extra bottom padding so bottom browser UI doesn't overlap controls */
+        padding-bottom: 72px; /* fallback */
+        padding-bottom: calc(72px + env(safe-area-inset-bottom)); /* add safe-area if present */
+      }
       #titleImage, #musicbar, #controls { width: 100%; max-width: 100%; box-sizing: border-box; }
       #musicbar { box-sizing: border-box; padding: 0 12px; }
       /* Canvas width will be set via JS; fallback respects body padding */
@@ -168,12 +175,12 @@
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    // Basic touch-capable device detection (used for UI hints)
-    // Robust touch/mobile detection: include pointer:coarse in addition to legacy checks
-    const IS_TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
-      || ('ontouchstart' in window)
-      || (navigator.maxTouchPoints > 0)
-      || (navigator.msMaxTouchPoints > 0);
+    // Determine mobile/desktop purely by viewport width (matching the CSS breakpoint)
+    function computeIsMobile() {
+      const vw = (window.visualViewport?.width || window.innerWidth);
+      return vw <= 600;
+    }
+    let IS_TOUCH = computeIsMobile();
     const titleImgEl = document.getElementById('titleImage');
     const musicBarEl = document.getElementById('musicbar');
     const controlsEl = document.getElementById('controls');
@@ -281,6 +288,33 @@
       drawBars();
     }
     let scReady = false;
+    let desiredPlaying = false; // user's intended state; UI reflects actual state from widget
+
+    function updateMusicUI(isPlaying) {
+      if (!musicIcon) return;
+      if (isPlaying) {
+        musicIcon.dataset.state = 'playing';
+        musicIcon.setAttribute('aria-label', 'Pause BGM');
+        musicIcon.title = 'Pause BGM';
+        if (musicIconPath) musicIconPath.setAttribute('d', 'M6 5h4v14H6zM14 5h4v14h-4z');
+        startScope();
+      } else {
+        musicIcon.dataset.state = 'paused';
+        musicIcon.setAttribute('aria-label', 'Play BGM');
+        musicIcon.title = 'Play BGM';
+        if (musicIconPath) musicIconPath.setAttribute('d', 'M8 5v14l11-7z');
+        stopScope();
+      }
+    }
+
+    function syncMusicStateFromWidget() {
+      if (!scWidget) return;
+      try {
+        scWidget.isPaused((paused) => {
+          updateMusicUI(!paused);
+        });
+      } catch(e) {}
+    }
     function initMusic() {
       if (!window.SC || !scIframe) return;
       scWidget = SC.Widget(scIframe);
@@ -288,46 +322,37 @@
         scReady = true;
         // Ensure we start paused by default
         try { scWidget.pause(); } catch(e) {}
+        desiredPlaying = false;
         if (musicIcon) {
           musicIcon.classList.remove('disabled');
-          musicIcon.dataset.state = 'paused';
-          musicIcon.setAttribute('aria-label', 'Play BGM');
-          musicIcon.title = 'Play BGM';
-          if (musicIconPath) musicIconPath.setAttribute('d', 'M8 5v14l11-7z'); // play triangle
         }
-        // Initialize scope drawing (paused state baseline)
-        startScope();
+        // Initialize scope drawing (paused baseline) and sync UI from widget
+        stopScope();
+        syncMusicStateFromWidget();
       });
+
+      // Reflect actual play/pause events from the widget
+      scWidget.bind(SC.Widget.Events.PLAY, () => updateMusicUI(true));
+      scWidget.bind(SC.Widget.Events.PAUSE, () => updateMusicUI(false));
 
       // Loop the same track when it finishes
       scWidget.bind(SC.Widget.Events.FINISH, () => {
         try {
           scWidget.seekTo(0);
-          if (musicIcon?.dataset.state === 'playing') scWidget.play();
+          if (desiredPlaying) scWidget.play();
+          else updateMusicUI(false);
         } catch(e) {}
       });
 
       musicIcon?.addEventListener('click', () => {
         if (!scReady) return;
-        const isPaused = musicIcon.dataset.state !== 'playing';
-        if (isPaused) {
-          scWidget.play();
-          musicIcon.dataset.state = 'playing';
-          musicIcon.setAttribute('aria-label', 'Pause BGM');
-          musicIcon.title = 'Pause BGM';
-          if (musicIconPath) musicIconPath.setAttribute('d', 'M6 5h4v14H6zM14 5h4v14h-4z'); // pause bars
-          startScope();
-        } else {
-          scWidget.pause();
-          musicIcon.dataset.state = 'paused';
-          musicIcon.setAttribute('aria-label', 'Play BGM');
-          musicIcon.title = 'Play BGM';
-          if (musicIconPath) musicIconPath.setAttribute('d', 'M8 5v14l11-7z'); // play triangle
-          // Stop moving the scope (leave baseline)
-          // We don't cancel the RAF entirely to keep the baseline drawn; stop motion by not advancing
-          // but simpler: stop RAF and draw one paused frame
-          stopScope();
-        }
+        // Toggle desired state, but update UI only when widget confirms via events
+        desiredPlaying = !desiredPlaying;
+        try {
+          if (desiredPlaying) scWidget.play(); else scWidget.pause();
+        } catch(e) {}
+        // Fallback sync in case an event is missed (e.g., mobile autoplay quirks)
+        setTimeout(syncMusicStateFromWidget, 500);
       });
 
       // While loading: leave button disabled
@@ -349,6 +374,11 @@
         desktopInstrEl.style.fontSize = '14px';
         desktopInstrEl.style.color = '#000';
         desktopInstrEl.textContent = INSTR_TEXT;
+        if (!desktopButtonsBound) {
+          bindControl(btnLeft, (down) => { keys["ArrowLeft"] = !!down; });
+          bindControl(btnRight, (down) => { keys["ArrowRight"] = !!down; });
+          desktopButtonsBound = true;
+        }
       }
     }
     // Removed setMuted; we no longer support mute, only play/pause
@@ -560,9 +590,10 @@
     // On-canvas touch overlay removed; using HTML controls under the canvas.
 
     // HTML controls (always visible under the canvas)
-    const btnLeft = document.getElementById('btn-left');
-    const btnRight = document.getElementById('btn-right');
-    const btnJump = document.getElementById('btn-jump');
+  const btnLeft = document.getElementById('btn-left');
+  const btnRight = document.getElementById('btn-right');
+  const btnJump = document.getElementById('btn-jump');
+  let desktopButtonsBound = false;
 
     function bindControl(el, onPress) {
       if (!el) return;
@@ -586,12 +617,7 @@
       el.addEventListener('mouseleave', () => onPress(false));
     }
 
-    // On touch devices, we'll use the arrow group horizontal sweep control;
-    // keep individual button bindings only for non-touch (mouse) usage.
-    if (!IS_TOUCH) {
-      bindControl(btnLeft, (down) => { keys["ArrowLeft"] = !!down; });
-      bindControl(btnRight, (down) => { keys["ArrowRight"] = !!down; });
-    }
+    // Left/Right buttons will be bound in setupInputUI() when in desktop mode
     bindControl(btnJump, (down) => {
       if (down) {
         jumpBufferTimer = JUMP_BUFFER; // buffer jump
@@ -1034,9 +1060,17 @@
       restartGame();
       requestAnimationFrame(frame);
     }
-    // Resize handlers
-    window.addEventListener('resize', sizeCanvasToViewport);
-    window.visualViewport?.addEventListener('resize', sizeCanvasToViewport);
+    // Resize handlers: refresh UI mode by width and resize canvas
+    function refreshUIMode() {
+      const newIsMobile = computeIsMobile();
+      if (newIsMobile !== IS_TOUCH) {
+        IS_TOUCH = newIsMobile;
+        setupInputUI();
+      }
+      sizeCanvasToViewport();
+    }
+    window.addEventListener('resize', refreshUIMode);
+    window.visualViewport?.addEventListener('resize', refreshUIMode);
     window.addEventListener('orientationchange', () => setTimeout(sizeCanvasToViewport, 100));
     // Kick off after layout settles
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
