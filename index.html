@@ -744,7 +744,7 @@
       const newLevel = Math.floor(score / 1000) + 1;
       if (newLevel !== level) {
         level = newLevel;
-  levelUpPopup = { text: "LEVEL UP!", levelNumber: newLevel, y: canvas.height / 2, alpha: 0.5 };
+  levelUpPopup = { text: "LEVEL UP!", levelNumber: newLevel, y: 72, alpha: 0.5 };
         // uplifting chime
         playLevelUpSFX();
       }
@@ -896,7 +896,7 @@
       }
 
       if (levelUpPopup) {
-        levelUpPopup.y -= 1;
+  levelUpPopup.y -= 1;
         levelUpPopup.alpha -= 0.02;
         if (levelUpPopup.alpha <= 0) levelUpPopup = null;
       }
