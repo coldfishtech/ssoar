@@ -9,13 +9,6 @@ SSOAR is a tiny, fast, and focused canvas platformer built for mobile and deskto
 - Play online: https://yskysky.github.io/ssoar/
 - Code: this repository (single-file `index.html`)
 
-## Screenshot (optional)
-
-Add a screenshot named `screenshot.png` in the repo root to display it here.
-
-<!-- Uncomment this line after adding screenshot.png -->
-<!-- <p align="center"><img src="screenshot.png" alt="SSOAR gameplay screenshot" width="420" /></p> -->
-
 ## Controls
 
 - Mobile: on-screen Left/Right arrows + Jump button (sliding interaction supported)
