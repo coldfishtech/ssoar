@@ -851,7 +851,9 @@
 
         for (let i = 0; i < clouds.length; i++) {
           clouds[i].y += diff;
-          if (clouds[i].y > viewHeight()) {
+          const visibleBottom = ground.y + ground.height; // bottom edge of the visible world
+          // Despawn only when the entire cloud is below the bottom edge
+          if ((clouds[i].y - CLOUD_TOP_RISE) >= visibleBottom) {
             clouds.splice(i, 1);
             const newY = -cloudHeight - Math.random()*40;
             clouds.push(createCloud(newY));
