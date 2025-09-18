@@ -129,7 +129,7 @@
 
     /* Mobile-friendly layout: let elements span full width and canvas fill viewport remainder */
     @media (max-width: 600px) {
-      body { align-items: stretch; justify-content: flex-start; padding: 16px; }
+      body { align-items: stretch; justify-content: flex-start; padding: 24px; }
       #titleImage, #musicbar, #controls { width: 100%; max-width: 100%; box-sizing: border-box; }
       #musicbar { box-sizing: border-box; padding: 0 12px; }
       /* Canvas width will be set via JS; fallback respects body padding */
@@ -156,6 +156,8 @@
     </iframe>
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <!-- Desktop instructions (hidden on touch devices) -->
+  <div id="desktop-instructions" aria-hidden="true" style="display:none;"></div>
   <div id="controls" aria-label="Game Controls">
     <div id="arrow-group" class="ctrl-group-arrows" aria-label="Directional Controls">
       <button id="btn-left" class="ctrl-btn ctrl-arrow ctrl-arrow--left" aria-label="Left" title="Left" tabindex="-1"></button>
@@ -167,10 +169,15 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
     // Basic touch-capable device detection (used for UI hints)
-    const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+    // Robust touch/mobile detection: include pointer:coarse in addition to legacy checks
+    const IS_TOUCH = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+      || ('ontouchstart' in window)
+      || (navigator.maxTouchPoints > 0)
+      || (navigator.msMaxTouchPoints > 0);
     const titleImgEl = document.getElementById('titleImage');
     const musicBarEl = document.getElementById('musicbar');
     const controlsEl = document.getElementById('controls');
+  const desktopInstrEl = document.getElementById('desktop-instructions');
 
     // Responsive sizing: fill available viewport between title and controls
   function sizeCanvasToViewport() {
@@ -181,7 +188,8 @@
       // Measure occupied vertical space (title + music bar + margins)
       const titleH = titleImgEl?.offsetHeight || 0;
       const musicH = musicBarEl?.offsetHeight || 0;
-      const controlsH = controlsEl?.offsetHeight || 0;
+  const controlsH = controlsEl?.offsetHeight || 0;
+  const instrH = desktopInstrEl?.offsetHeight || 0;
   // Account for mobile padding (12px per side via CSS). Use computed style to be accurate.
   const cs = getComputedStyle(document.body);
   const padTop = parseFloat(cs.paddingTop) || 0;
@@ -191,7 +199,7 @@
   const bodyGap = 8; // small gaps between sections
 
       // Available height for canvas: viewport minus occupied elements and small gaps
-  const availableH = Math.max(200, vh - (padTop + padBottom + titleH + musicH + controlsH + bodyGap * 3));
+  const availableH = Math.max(200, vh - (padTop + padBottom + titleH + musicH + controlsH + instrH + bodyGap * 4));
 
   const isSmall = vw <= 600;
   // Width/Height rules: on small screens, fill width and available height; on desktop, keep original 400x600
@@ -215,6 +223,7 @@
 
     // Shared font stack to match level-up indication style
     const FONT_STACK_BOLD = 'Arial Black, Arial, Helvetica, sans-serif';
+  const INSTR_TEXT = 'Use \u2190 and \u2192 to move. Press Space to jump.'; // ← →
 
     // --- Simple SoundCloud music player (hidden iframe) ---
     let scWidget = null;
@@ -319,6 +328,24 @@
       // While loading: leave button disabled
       if (musicIcon) { musicIcon.classList.add('disabled'); }
     }
+    // Setup desktop vs mobile UI elements (controls vs instructions)
+    function setupInputUI() {
+      if (IS_TOUCH) {
+        // Mobile/tablet: show controls, hide desktop instructions
+        controlsEl.style.display = 'flex';
+        desktopInstrEl.style.display = 'none';
+      } else {
+        // Desktop: hide controls, show instructions in game font
+        controlsEl.style.display = 'none';
+        desktopInstrEl.style.display = 'block';
+        desktopInstrEl.style.marginTop = '10px';
+        desktopInstrEl.style.fontFamily = FONT_STACK_BOLD;
+        desktopInstrEl.style.fontWeight = '900';
+        desktopInstrEl.style.fontSize = '14px';
+        desktopInstrEl.style.color = '#000';
+        desktopInstrEl.textContent = INSTR_TEXT;
+      }
+    }
     // Removed setMuted; we no longer support mute, only play/pause
 
 
@@ -420,6 +447,20 @@
       osc.stop(now + durMs/1000);
     }
 
+    // Short musical cues
+    function playLevelUpSFX() {
+      // Uplifting rising triad
+      beep(620, 70, "triangle", 0.04);
+      setTimeout(() => beep(830, 80, "triangle", 0.038), 80);
+      setTimeout(() => beep(1180, 90, "triangle", 0.035), 160);
+    }
+    function playGameOverSFX() {
+      // Brief descending tones for a subtle disappointment
+      beep(360, 110, "square", 0.04);
+      setTimeout(() => beep(300, 120, "square", 0.035), 120);
+      setTimeout(() => beep(240, 140, "square", 0.03), 240);
+    }
+
     // -------- background stripes --------
     let bgOffset = 0;
     function drawScrollingSky() {
@@ -460,6 +501,7 @@
   let score = 0;
   let bestScore = Number(localStorage.getItem("cloudjump_best") || 0);
     let gameRunning = true;
+    let gameOverSFXPlayed = false;
   const keys = {};
 
     // input
@@ -558,6 +600,7 @@
       let activeDir = null; // 'left' | 'right' | null
       let captured = false;
       let midX = null; // horizontal threshold for left/right
+      let controllerPointerId = null; // the pointer that owns horizontal control
 
       // Avoid text selection/start drag when interacting with the arrow area
       arrowGroup.addEventListener('mousedown', (e) => { e.preventDefault(); });
@@ -583,6 +626,7 @@
       arrowGroup.addEventListener('pointerdown', (e) => {
         arrowGroup.setPointerCapture?.(e.pointerId);
         captured = true;
+        controllerPointerId = e.pointerId;
         // Cache the midpoint at gesture start
         const rect = arrowGroup.getBoundingClientRect();
         midX = rect.left + rect.width / 2;
@@ -591,13 +635,13 @@
         e.preventDefault();
       });
       const onMove = (e) => {
-        if (!captured) return;
+        if (!captured || e.pointerId !== controllerPointerId) return;
         const dir = dirFromPoint(e.clientX);
         setDir(dir);
         e.preventDefault();
       };
       const onUp = (e) => {
-        if (!captured) return;
+        if (!captured || e.pointerId !== controllerPointerId) return;
         endSlide();
         e.preventDefault();
       };
@@ -606,6 +650,7 @@
       function endSlide() {
         captured = false;
         midX = null;
+        controllerPointerId = null;
         activeDir = null;
         keys["ArrowLeft"] = false;
         keys["ArrowRight"] = false;
@@ -636,6 +681,7 @@
       jumpBufferTimer = 0;
 
       initClouds();
+      gameOverSFXPlayed = false;
     }
 
     function updateDifficulty() {
@@ -643,9 +689,8 @@
       if (newLevel !== level) {
         level = newLevel;
         levelUpPopup = { text: "LEVEL UP!", levelNumber: newLevel, y: canvas.height / 2, alpha: 1.0 };
-        // quick chime
-        beep(880, 80, "triangle", 0.04);
-        setTimeout(() => beep(1175, 80, "triangle", 0.035), 90);
+        // uplifting chime
+        playLevelUpSFX();
       }
       BASE_CLOUD_SPEED = 1.2 + (level-1) * 0.4;
       MAX_CLOUD_SPACING = 150 + (level-1) * 20;
@@ -778,6 +823,7 @@
       }
 
       if (player.y > canvas.height) {
+        if (!gameOverSFXPlayed) { playGameOverSFX(); gameOverSFXPlayed = true; }
         gameRunning = false;
         if (score > bestScore) {
           bestScore = score;
@@ -971,6 +1017,7 @@
     function bootstrap() {
       sizeCanvasToViewport();
       initMusic();
+      setupInputUI();
       restartGame();
       requestAnimationFrame(frame);
     }
