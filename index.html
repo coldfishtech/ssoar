@@ -193,7 +193,7 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
   // Render-time zoom (uniform) — apply only on mobile
-  const CAMERA_ZOOM = 1.5; // show ~1.5x more (zoom out)
+  const CAMERA_ZOOM = 1.2; // show ~1.2x more (zoom out on mobile)
   function getDrawScale() { return IS_TOUCH ? (1 / CAMERA_ZOOM) : 1; }
   function viewWidth() { return canvas.width / getDrawScale(); }
   function viewHeight() { return canvas.height / getDrawScale(); }
