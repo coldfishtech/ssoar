@@ -884,7 +884,9 @@
         }
       }
 
-      if (player.y > viewHeight()) {
+      // Die only after the player's top goes strictly below the visible bottom of the world
+      const visibleBottom = ground.y + ground.height;
+      if (player.y > visibleBottom) {
         if (!gameOverSFXPlayed) { playGameOverSFX(); gameOverSFXPlayed = true; }
         gameRunning = false;
         if (score > bestScore) {
