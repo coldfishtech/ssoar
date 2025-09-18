@@ -18,12 +18,20 @@
       align-items: center;
       min-height: 100vh;
     }
+    /* Prevent text/image selection and callouts during drag on mobile/desktop */
+    html, body {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
     #titleImage {
       width: 400px;
       max-width: 90vw;
       height: auto;
       image-rendering: pixelated;
       margin-bottom: 8px;
+      -webkit-user-drag: none;
+      user-select: none;
     }
     /* simple music bar under the title */
     #musicbar {
@@ -37,21 +45,34 @@
       font-family: Arial Black, Arial, Helvetica, sans-serif;
       font-weight: 900;
     }
-    #music-toggle {
+    #music-btn {
       height: 28px;
+      width: 44px;
       display: inline-flex; align-items: center; justify-content: center;
       border: 1px solid #b0b7c2; border-radius: 4px;
       background: #222; color: #fff; cursor: pointer;
-      padding: 0 10px; min-width: 56px;
+      padding: 0; min-width: 44px;
       font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: 12px;
     }
-    #music-status { font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: 12px; line-height: 1.2; color: #555; min-width: 64px; }
+    #music-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
     #music-label { font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: 12px; color: #222; }
+    /* Tiny frequency visualizer next to the music button */
+    #music-scope {
+      display: inline-block;
+      width: 60px;
+      height: 16px;
+      background: transparent;
+      border: none !important; /* override global canvas border */
+      box-shadow: none;
+    }
     
     canvas {
       background: transparent; /* the canvas draws its own sky, page around is off-white */
       image-rendering: pixelated;
       border: 1px solid #b0b7c2; /* subtle cool grey stroke */
+      -webkit-user-drag: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none; /* avoid scrolling/zoom while dragging on canvas */
     }
     /* always-visible controls under the canvas */
     #controls {
@@ -61,6 +82,9 @@
       justify-content: center;
       margin-top: 10px;
       user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none; /* avoid selecting/scrolling when sliding arrows */
     }
     .ctrl-btn {
       width: 56px;
@@ -75,6 +99,8 @@
       cursor: pointer;
       outline: none;
       margin: 0; /* eliminate default button margins */
+      -webkit-user-drag: none;
+      -webkit-tap-highlight-color: transparent;
     }
     /* arrows: pentagonal via clip-path; remove text visuals */
   .ctrl-arrow { width: 72px; height: 44px; border-radius: 0; font-size: 0; line-height: 0; }
@@ -99,11 +125,11 @@
 
     /* Mobile-friendly layout: let elements span full width and canvas fill viewport remainder */
     @media (max-width: 600px) {
-      body { align-items: stretch; justify-content: flex-start; }
-      #titleImage, #musicbar, #controls { width: 100vw; max-width: 100vw; }
+      body { align-items: stretch; justify-content: flex-start; padding: 16px; }
+      #titleImage, #musicbar, #controls { width: 100%; max-width: 100%; box-sizing: border-box; }
       #musicbar { box-sizing: border-box; padding: 0 12px; }
-      /* Canvas width will be set via JS for pixel-perfect scaling; this is a fallback */
-      canvas { width: 100vw; height: auto; }
+      /* Canvas width will be set via JS; fallback respects body padding */
+      canvas { width: 100%; height: auto; }
     }
   </style>
 </head>
@@ -111,8 +137,8 @@
   <img id="titleImage" src="ssoar_title.png" alt="SSOAR Title" />
   <div id="musicbar" aria-label="Music Player">
     <span id="music-label">BGM</span>
-    <span id="music-status" aria-live="polite">Loading</span>
-    <button id="music-toggle" type="button" aria-label="BGM: OFF" data-muted="true" title="Toggle BGM">OFF</button>
+    <button id="music-btn" type="button" aria-label="Play BGM" title="Play/Pause BGM" disabled tabindex="-1"></button>
+    <canvas id="music-scope" width="60" height="16" aria-hidden="true"></canvas>
     <!-- hidden SoundCloud widget iframe used for playback/control -->
     <iframe
       id="sc-widget"
@@ -120,20 +146,22 @@
       scrolling="no"
       frameborder="no"
       style="position:absolute; left:-9999px; width:0; height:0; border:0;"
-      src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/user-385939006/01-ddd&auto_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false&visual=false">
+      src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/user-385939006/01-ddd&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&visual=false">
     </iframe>
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
   <div id="controls" aria-label="Game Controls">
     <div id="arrow-group" class="ctrl-group-arrows" aria-label="Directional Controls">
-      <button id="btn-left" class="ctrl-btn ctrl-arrow ctrl-arrow--left" aria-label="Left" title="Left"></button>
-      <button id="btn-right" class="ctrl-btn ctrl-arrow ctrl-arrow--right" aria-label="Right" title="Right"></button>
+      <button id="btn-left" class="ctrl-btn ctrl-arrow ctrl-arrow--left" aria-label="Left" title="Left" tabindex="-1"></button>
+      <button id="btn-right" class="ctrl-btn ctrl-arrow ctrl-arrow--right" aria-label="Right" title="Right" tabindex="-1"></button>
     </div>
-    <button id="btn-jump" class="ctrl-btn ctrl-btn--jump" aria-label="Jump" title="Jump"></button>
+    <button id="btn-jump" class="ctrl-btn ctrl-btn--jump" aria-label="Jump" title="Jump" tabindex="-1"></button>
   </div>
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+    // Basic touch-capable device detection (used for UI hints)
+    const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
     const titleImgEl = document.getElementById('titleImage');
     const musicBarEl = document.getElementById('musicbar');
     const controlsEl = document.getElementById('controls');
@@ -141,21 +169,27 @@
     // Responsive sizing: fill available viewport between title and controls
   function sizeCanvasToViewport() {
       // Use visualViewport when available to account for mobile browser UI
-      const vw = (window.visualViewport?.width || window.innerWidth);
-      const vh = (window.visualViewport?.height || window.innerHeight);
+  const vw = (window.visualViewport?.width || window.innerWidth);
+  const vh = (window.visualViewport?.height || window.innerHeight);
 
       // Measure occupied vertical space (title + music bar + margins)
       const titleH = titleImgEl?.offsetHeight || 0;
       const musicH = musicBarEl?.offsetHeight || 0;
       const controlsH = controlsEl?.offsetHeight || 0;
-  const bodyGap = 8; // approximate small gaps/margins around sections
+  // Account for mobile padding (12px per side via CSS). Use computed style to be accurate.
+  const cs = getComputedStyle(document.body);
+  const padTop = parseFloat(cs.paddingTop) || 0;
+  const padBottom = parseFloat(cs.paddingBottom) || 0;
+  const padLeft = parseFloat(cs.paddingLeft) || 0;
+  const padRight = parseFloat(cs.paddingRight) || 0;
+  const bodyGap = 8; // small gaps between sections
 
       // Available height for canvas: viewport minus occupied elements and small gaps
-      const availableH = Math.max(200, vh - (titleH + musicH + controlsH + bodyGap * 3));
+  const availableH = Math.max(200, vh - (padTop + padBottom + titleH + musicH + controlsH + bodyGap * 3));
 
   const isSmall = vw <= 600;
   // Width/Height rules: on small screens, fill width and available height; on desktop, keep original 400x600
-  const targetW = isSmall ? vw : 400;
+  const targetW = isSmall ? Math.max(200, vw - (padLeft + padRight)) : 400;
   const targetH = isSmall ? availableH : 600;
 
       // Set CSS size for layout
@@ -178,60 +212,99 @@
 
     // --- Simple SoundCloud music player (hidden iframe) ---
     let scWidget = null;
-  let musicMuted = true; // independent of volume percentage
-    const scIframe = document.getElementById('sc-widget');
-    const musicToggleBtn = document.getElementById('music-toggle');
-  const musicStatusSpan = document.getElementById('music-status');
-    let scReady = false;
-    let statusDotsTimer = null;
-    function setStatusWithDots(baseText) {
-      if (!musicStatusSpan) return;
-      if (statusDotsTimer) { clearInterval(statusDotsTimer); statusDotsTimer = null; }
-      let dots = 0;
-      musicStatusSpan.textContent = baseText;
-      statusDotsTimer = setInterval(() => {
-        dots = (dots + 1) % 4; // 0..3
-        musicStatusSpan.textContent = baseText + '.'.repeat(dots);
-      }, 450);
+  const scIframe = document.getElementById('sc-widget');
+  const musicBtn = document.getElementById('music-btn');
+    const musicScope = document.getElementById('music-scope');
+    const scopeCtx = musicScope?.getContext('2d') || null;
+    let scopeAnimId = null;
+    let tick = 0;
+
+    function drawBars() {
+      if (!scopeCtx || !musicScope) return;
+      const w = musicScope.width, h = musicScope.height;
+      scopeCtx.clearRect(0, 0, w, h);
+      // Parameters for 6 tiny bars
+      const bars = 6;
+      const gap = 2;
+      const bw = Math.floor((w - gap * (bars - 1)) / bars);
+      const isPlaying = musicBtn?.dataset.state === 'playing';
+      const minPx = 2; // minimal height for paused bars
+      for (let i = 0; i < bars; i++) {
+        // When paused, show uniform minimal bars; when playing, vary heights over time
+        let barH;
+        if (!isPlaying) {
+          barH = minPx;
+        } else {
+          const base = 0.25; // base relative height
+          const amp = 0.6;
+          const val = base + amp * (0.5 + 0.5 * Math.sin((tick * 0.15) + i * 0.9));
+          barH = Math.max(minPx, Math.min(h, Math.round(val * h)));
+        }
+        const x = i * (bw + gap);
+        const y = h - barH;
+        scopeCtx.fillStyle = '#222';
+        scopeCtx.fillRect(x, y, bw, barH);
+      }
     }
+    function startScope() {
+      if (scopeAnimId) return;
+      const step = () => {
+        tick++;
+        drawBars();
+        scopeAnimId = requestAnimationFrame(step);
+      };
+      scopeAnimId = requestAnimationFrame(step);
+    }
+    function stopScope() {
+      if (scopeAnimId) { cancelAnimationFrame(scopeAnimId); scopeAnimId = null; }
+      drawBars();
+    }
+    let scReady = false;
     function initMusic() {
       if (!window.SC || !scIframe) return;
       scWidget = SC.Widget(scIframe);
       scWidget.bind(SC.Widget.Events.READY, () => {
         scReady = true;
-        // Begin playback muted (volume 0) to comply with autoplay policy
-        try { scWidget.setVolume(0); } catch(e) {}
-        scWidget.play();
-        setMuted(true); // keep muted by default until user unmutes
-        // enable toggle now that we're ready
-        if (musicToggleBtn) musicToggleBtn.disabled = false;
-        // switch status to Playing with animated dots
-        setStatusWithDots('Playing');
+        // Ensure we start paused by default
+        try { scWidget.pause(); } catch(e) {}
+        if (musicBtn) {
+          musicBtn.disabled = false;
+          musicBtn.dataset.state = 'paused';
+          musicBtn.textContent = '▶';
+          musicBtn.setAttribute('aria-label', 'Play BGM');
+          musicBtn.title = 'Play BGM';
+        }
+        // Initialize scope drawing (paused state baseline)
+        startScope();
       });
 
-      musicToggleBtn?.addEventListener('click', () => {
-        setMuted(!musicMuted);
-        // If unmuting, ensure playback resumes and volume is full
-        if (!musicMuted && scReady) {
-          try { scWidget.setVolume(100); } catch(e) {}
+      musicBtn?.addEventListener('click', () => {
+        if (!scReady) return;
+        const isPaused = musicBtn.dataset.state !== 'playing';
+        if (isPaused) {
           scWidget.play();
+          musicBtn.dataset.state = 'playing';
+          musicBtn.textContent = '⏸';
+          musicBtn.setAttribute('aria-label', 'Pause BGM');
+          musicBtn.title = 'Pause BGM';
+          startScope();
+        } else {
+          scWidget.pause();
+          musicBtn.dataset.state = 'paused';
+          musicBtn.textContent = '▶';
+          musicBtn.setAttribute('aria-label', 'Play BGM');
+          musicBtn.title = 'Play BGM';
+          // Stop moving the scope (leave baseline)
+          // We don't cancel the RAF entirely to keep the baseline drawn; stop motion by not advancing
+          // but simpler: stop RAF and draw one paused frame
+          stopScope();
         }
       });
 
-      // While loading: disable UI and show animated "Loading..."
-      if (musicToggleBtn) musicToggleBtn.disabled = true;
-      setStatusWithDots('Loading');
+      // While loading: leave button disabled
+      if (musicBtn) { musicBtn.disabled = true; musicBtn.textContent = '▶'; }
     }
-    function setMuted(flag) {
-      musicMuted = !!flag;
-      if (scWidget) scWidget.setVolume(musicMuted ? 0 : 100);
-      if (musicToggleBtn) {
-        musicToggleBtn.dataset.muted = musicMuted ? 'true' : 'false';
-        musicToggleBtn.textContent = musicMuted ? 'OFF' : 'ON';
-        musicToggleBtn.setAttribute('aria-label', musicMuted ? 'BGM: OFF' : 'BGM: ON');
-        musicToggleBtn.title = 'Toggle BGM';
-      }
-  }
+    // Removed setMuted; we no longer support mute, only play/pause
 
 
     // -------- core tunables --------
@@ -428,6 +501,9 @@
 
     function bindControl(el, onPress) {
       if (!el) return;
+      // Prevent buttons from grabbing focus or triggering default text selection on drag
+      el.addEventListener('mousedown', (e) => { e.preventDefault(); });
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
       el.addEventListener('pointerdown', (e) => {
         el.setPointerCapture?.(e.pointerId);
         onPress(true);
@@ -462,6 +538,10 @@
     if (arrowGroup && btnLeft && btnRight) {
       let activeDir = null; // 'left' | 'right' | null
       let captured = false;
+
+      // Avoid text selection/start drag when interacting with the arrow area
+      arrowGroup.addEventListener('mousedown', (e) => { e.preventDefault(); });
+      arrowGroup.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
 
       function setDir(dir) {
         if (dir === activeDir) return;
@@ -530,7 +610,7 @@
       const newLevel = Math.floor(score / 1000) + 1;
       if (newLevel !== level) {
         level = newLevel;
-        levelUpPopup = { text: "LEVEL UP!", y: canvas.height / 2, alpha: 1.0 };
+        levelUpPopup = { text: "LEVEL UP!", levelNumber: newLevel, y: canvas.height / 2, alpha: 1.0 };
         // quick chime
         beep(880, 80, "triangle", 0.04);
         setTimeout(() => beep(1175, 80, "triangle", 0.035), 90);
@@ -654,8 +734,14 @@
 
       for (let cloud of clouds) {
         cloud.x += cloud.dx * (delta / 16.6667);
-        if (cloud.x <= 0 || cloud.x + cloud.width >= canvas.width) {
-          cloud.dx *= -1;
+        const right = cloud.x + cloud.width;
+        // Robust bounce: clamp inside bounds and force velocity inward
+        if (cloud.x < 0) {
+          cloud.x = 0;
+          cloud.dx = Math.abs(cloud.dx);
+        } else if (right > canvas.width) {
+          cloud.x = canvas.width - cloud.width;
+          cloud.dx = -Math.abs(cloud.dx);
         }
       }
 
@@ -773,7 +859,10 @@
       ctx.fillStyle = "#000";
       ctx.font = `16px ${FONT_STACK_BOLD}`;
       ctx.fillText("Score: " + Math.floor(score), 10, 22);
-      ctx.fillText("Level: " + level, 320, 22);
+      // Right-align the Level label to always fit within the canvas
+      ctx.textAlign = 'right';
+      ctx.fillText("Level: " + level, canvas.width - 10, 22);
+      ctx.textAlign = 'left';
       ctx.font = `12px ${FONT_STACK_BOLD}`;
       ctx.fillText("Best: " + Math.floor(bestScore), 10, 38);
       // show pause indicator subtly
@@ -799,8 +888,11 @@
       ctx.fillStyle="#fff"; ctx.font=`20px ${FONT_STACK_BOLD}`;
       ctx.fillText("Restart", canvas.width/2, btnY+btnH/2+7);
 
-      ctx.font=`16px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY+btnH+28);
+      // Only show keyboard hint on non-touch devices
+      if (!IS_TOUCH) {
+        ctx.font=`16px ${FONT_STACK_BOLD}`;
+        ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY+btnH+28);
+      }
 
       ctx.textAlign="left";
     }
@@ -816,9 +908,18 @@
 
       if (levelUpPopup) {
         ctx.fillStyle = `rgba(0, 0, 0, ${levelUpPopup.alpha})`;
-        ctx.font = `28px ${FONT_STACK_BOLD}`;
         ctx.textAlign = "center";
+        // Headline: half the previous size (28px)
+        const headlineSize = 28;
+        ctx.font = `${headlineSize}px ${FONT_STACK_BOLD}`;
         ctx.fillText(levelUpPopup.text, canvas.width/2, levelUpPopup.y);
+  // Number: three times bigger than before (44px * 3 = 132px)
+  const numberSize = 132;
+  ctx.font = `${numberSize}px ${FONT_STACK_BOLD}`;
+  const sub = String(levelUpPopup.levelNumber ?? level);
+  // Increase spacing: base it on the number size so it scales well
+  const numberOffset = Math.max(110, Math.round(numberSize * 0.9));
+  ctx.fillText(sub, canvas.width/2, levelUpPopup.y + numberOffset);
         ctx.textAlign = "left";
       }
 
