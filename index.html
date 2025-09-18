@@ -218,6 +218,11 @@
         canvas.height = logicalH;
         // Reset any transforms after resize
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        // Ensure ground spans the new canvas width
+        if (ground) {
+          ground.x = 0;
+          ground.width = canvas.width;
+        }
       }
     }
 
