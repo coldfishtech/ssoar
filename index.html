@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cloud Jump</title>
+  <script src="https://w.soundcloud.com/player/api.js"></script>
+  <style>
+    html {
+      background: #f6f8fb; /* subtle cool off-white */
+    }
+    body {
+      margin: 0;
+      background: #f6f8fb; /* subtle cool off-white */
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #titleImage {
+      width: 400px;
+      max-width: 90vw;
+      height: auto;
+      image-rendering: pixelated;
+      margin-bottom: 8px;
+    }
+    /* simple music bar under the title */
+    #musicbar {
+      width: 400px;
+      max-width: 90vw;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      /* Use the same bold font as the in-game text */
+      font-family: Arial Black, Arial, Helvetica, sans-serif;
+      font-weight: 900;
+    }
+    #music-toggle {
+      height: 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid #b0b7c2; border-radius: 4px;
+      background: #222; color: #fff; cursor: pointer;
+      padding: 0 10px; min-width: 56px;
+      font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: 12px;
+    }
+    #music-status { font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: 12px; line-height: 1.2; color: #555; min-width: 64px; }
+    #music-label { font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: 12px; color: #222; }
+    
+    canvas {
+      background: transparent; /* the canvas draws its own sky, page around is off-white */
+      image-rendering: pixelated;
+      border: 1px solid #b0b7c2; /* subtle cool grey stroke */
+    }
+    /* always-visible controls under the canvas */
+    #controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      margin-top: 10px;
+      user-select: none;
+    }
+    .ctrl-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1px solid #b0b7c2;
+      background: #222;
+      color: #fff;
+      font: 24px/56px Arial, sans-serif;
+      text-align: center;
+      padding: 0;
+      cursor: pointer;
+      outline: none;
+      margin: 0; /* eliminate default button margins */
+    }
+    /* arrows: pentagonal via clip-path; remove text visuals */
+  .ctrl-arrow { width: 72px; height: 44px; border-radius: 0; font-size: 0; line-height: 0; }
+  /* sleeker arrows: body extends fully to inner edge so no seam between buttons */
+  .ctrl-arrow--right { clip-path: polygon(0% 0%, 82% 0%, 100% 50%, 82% 100%, 0% 100%); }
+  .ctrl-arrow--left  { clip-path: polygon(100% 0%, 18% 0%, 0% 50%, 18% 100%, 100% 100%); }
+    /* arrow group: tighter spacing and better touch handling */
+    .ctrl-group-arrows {
+      display: flex;
+      gap: 2px;            /* slight visual separation */
+      touch-action: none;  /* allow sliding without triggering page scroll/zoom */
+    }
+    /* jump (spacebar): keep circular but no symbol */
+    .ctrl-btn--jump {
+      width: 68px; height: 68px;
+      border-radius: 50%;
+      font-size: 0; line-height: 0;
+      -webkit-appearance: none; appearance: none;
+      clip-path: none; /* ensure no polygon shape leaks onto jump */
+    }
+    .ctrl-btn:active { filter: brightness(1.15); }
+  </style>
+</head>
+<body>
+  <img id="titleImage" src="ssoar_title.png" alt="SSOAR Title" />
+  <div id="musicbar" aria-label="Music Player">
+    <span id="music-label">BGM</span>
+    <span id="music-status" aria-live="polite">Loading</span>
+    <button id="music-toggle" type="button" aria-label="BGM: OFF" data-muted="true" title="Toggle BGM">OFF</button>
+    <!-- hidden SoundCloud widget iframe used for playback/control -->
+    <iframe
+      id="sc-widget"
+      allow="autoplay"
+      scrolling="no"
+      frameborder="no"
+      style="position:absolute; left:-9999px; width:0; height:0; border:0;"
+      src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/user-385939006/01-ddd&auto_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false&visual=false">
+    </iframe>
+  </div>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <div id="controls" aria-label="Game Controls">
+    <div id="arrow-group" class="ctrl-group-arrows" aria-label="Directional Controls">
+      <button id="btn-left" class="ctrl-btn ctrl-arrow ctrl-arrow--left" aria-label="Left" title="Left"></button>
+      <button id="btn-right" class="ctrl-btn ctrl-arrow ctrl-arrow--right" aria-label="Right" title="Right"></button>
+    </div>
+    <button id="btn-jump" class="ctrl-btn ctrl-btn--jump" aria-label="Jump" title="Jump"></button>
+  </div>
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Shared font stack to match level-up indication style
+    const FONT_STACK_BOLD = 'Arial Black, Arial, Helvetica, sans-serif';
+
+    // --- Simple SoundCloud music player (hidden iframe) ---
+    let scWidget = null;
+  let musicMuted = true; // independent of volume percentage
+    const scIframe = document.getElementById('sc-widget');
+    const musicToggleBtn = document.getElementById('music-toggle');
+  const musicStatusSpan = document.getElementById('music-status');
+    let scReady = false;
+    let statusDotsTimer = null;
+    function setStatusWithDots(baseText) {
+      if (!musicStatusSpan) return;
+      if (statusDotsTimer) { clearInterval(statusDotsTimer); statusDotsTimer = null; }
+      let dots = 0;
+      musicStatusSpan.textContent = baseText;
+      statusDotsTimer = setInterval(() => {
+        dots = (dots + 1) % 4; // 0..3
+        musicStatusSpan.textContent = baseText + '.'.repeat(dots);
+      }, 450);
+    }
+    function initMusic() {
+      if (!window.SC || !scIframe) return;
+      scWidget = SC.Widget(scIframe);
+      scWidget.bind(SC.Widget.Events.READY, () => {
+        scReady = true;
+        // Begin playback muted (volume 0) to comply with autoplay policy
+        try { scWidget.setVolume(0); } catch(e) {}
+        scWidget.play();
+        setMuted(true); // keep muted by default until user unmutes
+        // enable toggle now that we're ready
+        if (musicToggleBtn) musicToggleBtn.disabled = false;
+        // switch status to Playing with animated dots
+        setStatusWithDots('Playing');
+      });
+
+      musicToggleBtn?.addEventListener('click', () => {
+        setMuted(!musicMuted);
+        // If unmuting, ensure playback resumes and volume is full
+        if (!musicMuted && scReady) {
+          try { scWidget.setVolume(100); } catch(e) {}
+          scWidget.play();
+        }
+      });
+
+      // While loading: disable UI and show animated "Loading..."
+      if (musicToggleBtn) musicToggleBtn.disabled = true;
+      setStatusWithDots('Loading');
+    }
+    function setMuted(flag) {
+      musicMuted = !!flag;
+      if (scWidget) scWidget.setVolume(musicMuted ? 0 : 100);
+      if (musicToggleBtn) {
+        musicToggleBtn.dataset.muted = musicMuted ? 'true' : 'false';
+        musicToggleBtn.textContent = musicMuted ? 'OFF' : 'ON';
+        musicToggleBtn.setAttribute('aria-label', musicMuted ? 'BGM: OFF' : 'BGM: ON');
+        musicToggleBtn.title = 'Toggle BGM';
+      }
+  }
+
+
+    // -------- core tunables --------
+  // These base values are tuned for ~60fps; we scale by dt in code paths below where needed.
+  const gravity = 0.5;
+  const playerSpeed = 3;
+  const jumpPower = -20;
+
+    // -------- ground --------
+    const groundHeight = 24;
+    const ground = { x: 0, y: 0, width: 400, height: groundHeight };
+    let groundActive = true;
+
+    // -------- player --------
+    const player = {
+      width: 32, height: 32,
+      x: 0, y: 0,
+      dx: 0, dy: 0,
+      canJump: true
+    };
+
+    // -------- clouds --------
+    const cloudWidth = 64, cloudHeight = 16;
+    let clouds = [];
+
+    // -------- difficulty / level --------
+  let MAX_CLOUD_SPACING = 150;
+  let BASE_CLOUD_SPEED = 1.2;
+    let level = 1;
+  // (reverted) no additional spacing control constants
+
+
+    // level-up popup
+    let levelUpPopup = null;
+
+    // restart cooldown (ms)
+    let restartCooldown = 0;
+
+  // NEW: track if space is currently held
+    let spaceHeld = false;
+
+  // NEW: coyote time & jump buffer (ms)
+  const COYOTE_TIME = 120; // ms
+  const JUMP_BUFFER = 100; // ms
+  let coyoteTimer = 0;     // counts down when leaving ground
+  let jumpBufferTimer = 0; // counts down after early space press
+
+  // Pause flag (used later with future pause/mute work; currently not toggled)
+  let paused = false;
+    // --- particles ---
+    const particles = [];
+    function spawnPuff(x, y, count = 6, color = "#ffffff") {
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x, y,
+          dx: (Math.random()*2-1) * 1.5,
+          dy: -Math.random()*2 - 0.5,
+          life: 300,
+          color,
+          size: 2 + Math.random()*2
+        });
+      }
+    }
+    function updateParticles(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= dt;
+        if (p.life <= 0) { particles.splice(i,1); continue; }
+        const step = dt/16.6667;
+        p.x += p.dx * step;
+        p.y += p.dy * step;
+        p.dy += 0.05 * step;
+      }
+    }
+    function drawParticles() {
+      for (const p of particles) {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+      }
+    }
+    // Basic AudioContext SFX
+    let audioCtx = null;
+    function ensureAudio() {
+      if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+      }
+    }
+    function beep(freq = 440, durMs = 100, type = "sine", gain = 0.05) {
+      ensureAudio();
+      if (!audioCtx) return;
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = type; osc.frequency.value = freq;
+      g.gain.value = gain;
+      osc.connect(g); g.connect(audioCtx.destination);
+      const now = audioCtx.currentTime;
+      osc.start(now);
+      osc.stop(now + durMs/1000);
+    }
+
+    // -------- background stripes --------
+    let bgOffset = 0;
+    function drawScrollingSky() {
+      const stripeHeight = 32;
+      // Subtle cool near-white palette (very light blue/grey)
+      const colors = ["#f4f8fc", "#f1f6fb", "#eef4f9", "#f1f6fb"];
+      const total = Math.ceil(canvas.height / stripeHeight) + 2;
+      for (let i = 0; i < total; i++) {
+        const y = (i * stripeHeight + (bgOffset % (stripeHeight * colors.length) + stripeHeight * colors.length)) % (stripeHeight * colors.length);
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fillRect(0, y, canvas.width, stripeHeight);
+      }
+    }
+
+    function createCloud(y) {
+      return {
+        x: Math.random() * (canvas.width - cloudWidth),
+        y,
+        width: cloudWidth,
+        height: cloudHeight,
+        dx: (Math.random() * BASE_CLOUD_SPEED + BASE_CLOUD_SPEED) * (Math.random() < 0.5 ? -1 : 1)
+      };
+    }
+
+  // (reverted) no top spawn tracker
+
+    function initClouds() {
+      clouds = [];
+      const startY = ground.y - 80;
+      for (let i = 0; i < 6; i++) {
+        const spacing = (MAX_CLOUD_SPACING - 40) + Math.random() * 40;
+        const y = startY - i * spacing;
+        clouds.push(createCloud(y));
+      }
+    }
+
+    // -------- game state --------
+  let score = 0;
+  let bestScore = Number(localStorage.getItem("cloudjump_best") || 0);
+    let gameRunning = true;
+  const keys = {};
+
+    // input
+    window.addEventListener("keydown", e => {
+      if (["ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
+      keys[e.code] = true;
+
+      if (!gameRunning && e.code === "Space") {
+        restartGame();
+        keys["Space"] = false;
+        spaceHeld = true; // treat it as held after restart
+      }
+      // Jump buffer: if space pressed while not currently able to jump, start/refresh buffer timer
+      if (e.code === "Space") {
+        jumpBufferTimer = JUMP_BUFFER;
+      }
+    });
+    window.addEventListener("keyup", e => {
+      if (["ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
+      keys[e.code] = false;
+
+      if (e.code === "Space") {
+        spaceHeld = false; // reset when released
+      }
+    });
+
+      // Pause toggle
+    window.addEventListener("keydown", e => {
+      if (e.code === "KeyP") {
+        paused = !paused;
+      }
+    });
+
+    canvas.addEventListener("click", e => {
+      if (!gameRunning) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const btnW = 110, btnH = 44;
+        const btnX = canvas.width/2 - btnW/2;
+        const btnY = canvas.height/2 + 72;
+        if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH) {
+          restartGame();
+        }
+      }
+    });
+
+    // On-canvas touch overlay removed; using HTML controls under the canvas.
+
+    // HTML controls (always visible under the canvas)
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const btnJump = document.getElementById('btn-jump');
+
+    function bindControl(el, onPress) {
+      if (!el) return;
+      el.addEventListener('pointerdown', (e) => {
+        el.setPointerCapture?.(e.pointerId);
+        onPress(true);
+        e.preventDefault();
+      });
+      el.addEventListener('pointerup', (e) => {
+        onPress(false);
+        e.preventDefault();
+      });
+      el.addEventListener('pointercancel', (e) => {
+        onPress(false);
+        e.preventDefault();
+      });
+      el.addEventListener('lostpointercapture', () => onPress(false));
+      el.addEventListener('mouseleave', () => onPress(false));
+    }
+
+    bindControl(btnLeft, (down) => { keys["ArrowLeft"] = !!down; });
+    bindControl(btnRight, (down) => { keys["ArrowRight"] = !!down; });
+    bindControl(btnJump, (down) => {
+      if (down) {
+        jumpBufferTimer = JUMP_BUFFER; // buffer jump
+        keys["Space"] = true;         // press Space
+      } else {
+        keys["Space"] = false;        // release Space
+        spaceHeld = false;             // require fresh press
+      }
+    });
+
+    // Sliding interaction for arrows: allows dragging finger between Left/Right seamlessly
+    const arrowGroup = document.getElementById('arrow-group');
+    if (arrowGroup && btnLeft && btnRight) {
+      let activeDir = null; // 'left' | 'right' | null
+      let captured = false;
+
+      function setDir(dir) {
+        if (dir === activeDir) return;
+        // release previous
+        keys["ArrowLeft"] = false;
+        keys["ArrowRight"] = false;
+        if (dir === 'left') keys["ArrowLeft"] = true;
+        else if (dir === 'right') keys["ArrowRight"] = true;
+        activeDir = dir;
+      }
+
+      function dirFromPoint(clientX, clientY) {
+        const rect = arrowGroup.getBoundingClientRect();
+        const mid = rect.left + rect.width / 2;
+        if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+        return clientX < mid ? 'left' : 'right';
+      }
+
+      arrowGroup.addEventListener('pointerdown', (e) => {
+        arrowGroup.setPointerCapture?.(e.pointerId);
+        captured = true;
+        const dir = dirFromPoint(e.clientX, e.clientY);
+        setDir(dir);
+        e.preventDefault();
+      });
+      arrowGroup.addEventListener('pointermove', (e) => {
+        if (!captured) return;
+        const dir = dirFromPoint(e.clientX, e.clientY);
+        setDir(dir);
+        e.preventDefault();
+      });
+      function endSlide() {
+        captured = false;
+        activeDir = null;
+        keys["ArrowLeft"] = false;
+        keys["ArrowRight"] = false;
+      }
+      arrowGroup.addEventListener('pointerup', (e) => { endSlide(); e.preventDefault(); });
+      arrowGroup.addEventListener('pointercancel', (e) => { endSlide(); e.preventDefault(); });
+      arrowGroup.addEventListener('lostpointercapture', endSlide);
+      arrowGroup.addEventListener('mouseleave', endSlide);
+    }
+
+    function restartGame() {
+      ground.x = 0;
+      ground.y = canvas.height - groundHeight;
+      ground.width = canvas.width;
+      groundActive = true;
+
+      player.x = canvas.width/2 - player.width/2;
+      player.y = ground.y - player.height;
+      player.dx = 0; player.dy = 0; player.canJump = true;
+
+  score = 0; gameRunning = true; bgOffset = 0; paused = false;
+      MAX_CLOUD_SPACING = 150; BASE_CLOUD_SPEED = 1.2; level = 1; levelUpPopup = null;
+
+      restartCooldown = 200;
+      spaceHeld = false;
+      coyoteTimer = 0;
+      jumpBufferTimer = 0;
+
+      initClouds();
+    }
+
+    function updateDifficulty() {
+      const newLevel = Math.floor(score / 1000) + 1;
+      if (newLevel !== level) {
+        level = newLevel;
+        levelUpPopup = { text: "LEVEL UP!", y: canvas.height / 2, alpha: 1.0 };
+        // quick chime
+        beep(880, 80, "triangle", 0.04);
+        setTimeout(() => beep(1175, 80, "triangle", 0.035), 90);
+      }
+      BASE_CLOUD_SPEED = 1.2 + (level-1) * 0.4;
+      MAX_CLOUD_SPACING = 150 + (level-1) * 20;
+    }
+
+    function update(dt) {
+      if (!gameRunning) {
+        // Freeze popup state during game over
+        return;
+      }
+      if (paused) return;
+
+      const delta = Math.min(Math.max(dt, 0), 100);
+      if (restartCooldown > 0) restartCooldown = Math.max(0, restartCooldown - delta);
+
+      const prevY = player.y;
+      const prevBottom = prevY + player.height;
+
+      if (keys["ArrowLeft"]) player.dx = -playerSpeed;
+      else if (keys["ArrowRight"]) player.dx = playerSpeed;
+      else player.dx = 0;
+
+      // Jump logic with coyote time and jump buffer
+      // If space is currently held down, we do not consume it repeatedly; we rely on fresh press logic elsewhere.
+      const wantsJump = (keys["Space"] && !spaceHeld) || jumpBufferTimer > 0;
+      const canJumpNow = (player.canJump || coyoteTimer > 0) && restartCooldown <= 0;
+      if (wantsJump && canJumpNow) {
+        player.dy = jumpPower;
+        player.canJump = false;
+        spaceHeld = keys["Space"]; // prevent immediate re-trigger while held
+        jumpBufferTimer = 0; // consume buffer
+        beep(660, 90, "square", 0.04); // jump SFX
+        // jump puff
+        spawnPuff(player.x + player.width/2, player.y + player.height, 6, "#ffffff");
+      }
+
+      // Time-based physics: scale by delta where appropriate
+      const step = delta / 16.6667; // approx 60fps base
+      player.dy += gravity * step;
+      player.x += player.dx * step;
+      player.y += player.dy * step;
+
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+      const currBottom = player.y + player.height;
+      const wasCanJump = player.canJump;
+      player.canJump = false;
+      let onCloud = null;
+
+      if (groundActive && currBottom >= ground.y && prevBottom <= ground.y) {
+        player.dy = 0;
+        player.y = ground.y - player.height;
+        player.canJump = true;
+        if (!wasCanJump) beep(220, 60, "sine", 0.03); // land SFX
+        if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 8, "#e6f7ff");
+      }
+
+      for (let cloud of clouds) {
+        if (
+          currBottom >= cloud.y &&
+          prevBottom <= cloud.y &&
+          (player.x + player.width) > cloud.x &&
+          player.x < cloud.x + cloud.width
+        ) {
+          player.dy = 0;
+          player.y = cloud.y - player.height;
+          player.canJump = true;
+          onCloud = cloud;
+          if (!wasCanJump) beep(220, 60, "sine", 0.03); // land SFX
+          if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 6, "#f0f8ff");
+        }
+      }
+
+      if (onCloud) {
+        player.x += onCloud.dx * step;
+        if (player.x < 0) player.x = 0;
+        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+      }
+
+      // Update coyote/jump buffer timers
+      if (player.canJump) {
+        coyoteTimer = COYOTE_TIME; // reset while grounded
+      } else {
+        coyoteTimer = Math.max(0, coyoteTimer - delta);
+      }
+      if (!player.canJump && keys["Space"]) {
+        // buffer already refreshed on keydown; here we keep it counting down
+        jumpBufferTimer = Math.max(0, jumpBufferTimer - delta);
+      } else if (!keys["Space"]) {
+        // if not held, buffer should still count down
+        jumpBufferTimer = Math.max(0, jumpBufferTimer - delta);
+      }
+
+      if (player.y < canvas.height / 2) {
+        const diff = (canvas.height / 2) - player.y;
+        player.y = canvas.height / 2;
+
+        for (let i = 0; i < clouds.length; i++) {
+          clouds[i].y += diff;
+          if (clouds[i].y > canvas.height) {
+            clouds.splice(i, 1);
+            const newY = -cloudHeight - Math.random()*40;
+            clouds.push(createCloud(newY));
+            i--;
+          }
+        }
+
+        if (groundActive) {
+          ground.y += diff;
+          if (ground.y > canvas.height + groundHeight) groundActive = false;
+        }
+
+        bgOffset = (bgOffset + diff/2);
+        score += Math.floor(diff);
+        updateDifficulty();
+      }
+
+      for (let cloud of clouds) {
+        cloud.x += cloud.dx * (delta / 16.6667);
+        if (cloud.x <= 0 || cloud.x + cloud.width >= canvas.width) {
+          cloud.dx *= -1;
+        }
+      }
+
+      if (player.y > canvas.height) {
+        gameRunning = false;
+        if (score > bestScore) {
+          bestScore = score;
+          try { localStorage.setItem("cloudjump_best", String(bestScore)); } catch(e) {}
+        }
+      }
+
+      if (levelUpPopup) {
+        levelUpPopup.y -= 1;
+        levelUpPopup.alpha -= 0.02;
+        if (levelUpPopup.alpha <= 0) levelUpPopup = null;
+      }
+      updateParticles(delta);
+    }
+
+    // -------- drawing --------
+    function drawCloud(cloud) {
+      // Original simple two-rectangle cloud with a single outer stroke around the combined shape
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(cloud.x, cloud.y, cloud.width, cloud.height);
+      ctx.fillRect(cloud.x + 4, cloud.y - 6, cloud.width - 8, cloud.height);
+
+      const x = cloud.x, y = cloud.y, w = cloud.width, h = cloud.height;
+      ctx.beginPath();
+      // trace outer contour of the union of base rect and top rect
+      ctx.moveTo(x, y + h);                // bottom-left
+      ctx.lineTo(x, y);                    // up left edge to top of base
+      ctx.lineTo(x + 4, y);                // to start of top rect inset
+      ctx.lineTo(x + 4, y - 6);            // up to top rect top edge
+      ctx.lineTo(x + w - 4, y - 6);        // across top edge of top rect
+      ctx.lineTo(x + w - 4, y);            // down to top of base at right inset
+      ctx.lineTo(x + w, y);                // to right edge
+      ctx.lineTo(x + w, y + h);            // down to bottom-right
+      ctx.closePath();
+      ctx.strokeStyle = "#b0b7c2"; // thin light grey
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // Concrete ground style with cracks texture
+    let concretePattern = null;
+    function getConcretePattern() {
+      if (concretePattern) return concretePattern;
+      const off = document.createElement('canvas');
+      off.width = 64; off.height = 64;
+      const c = off.getContext('2d');
+      // base concrete color
+      c.fillStyle = '#4a4f57';
+      c.fillRect(0, 0, off.width, off.height);
+      // subtle noise speckles
+      const imgData = c.getImageData(0,0,off.width,off.height);
+      for (let i = 0; i < imgData.data.length; i += 4) {
+        const n = (Math.random()*30)|0; // 0..29
+        imgData.data[i]   = Math.max(0, imgData.data[i]   - n);
+        imgData.data[i+1] = Math.max(0, imgData.data[i+1] - n);
+        imgData.data[i+2] = Math.max(0, imgData.data[i+2] - n);
+      }
+      c.putImageData(imgData, 0, 0);
+      // cracks: draw randomized branched lines
+      c.strokeStyle = 'rgba(20,22,25,0.6)';
+      c.lineWidth = 1;
+      c.lineCap = 'round';
+      function crack(x, y, len, angle, depth=0) {
+        c.beginPath();
+        c.moveTo(x, y);
+        const step = 4 + Math.random()*3;
+        let cx = x, cy = y, a = angle;
+        for (let t = 0; t < len; t += step) {
+          a += (Math.random()-0.5) * 0.3; // slight jitter
+          cx += Math.cos(a) * step;
+          cy += Math.sin(a) * step;
+          c.lineTo(cx, cy);
+          // occasional branch
+          if (depth < 2 && Math.random() < 0.1) {
+            crack(cx, cy, len * 0.25, a + (Math.random()<0.5?-1:1)*(0.6+Math.random()*0.6), depth+1);
+          }
+        }
+        c.stroke();
+      }
+      for (let i = 0; i < 6; i++) {
+        const sx = Math.random()*off.width;
+        const sy = Math.random()*off.height;
+        const ang = Math.random()*Math.PI*2;
+        crack(sx, sy, 36 + Math.random()*28, ang);
+      }
+      concretePattern = ctx.createPattern(off, 'repeat');
+      return concretePattern;
+    }
+
+    function drawGround() {
+      if (!groundActive) return;
+      // fill with dark concrete base
+      ctx.fillStyle = '#3f444b';
+      ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+      // overlay cracks pattern
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = getConcretePattern();
+      ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+      ctx.restore();
+      // subtle top highlight to separate from air
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(ground.x, ground.y, ground.width, 3);
+    }
+    function drawPlayer() {
+      ctx.fillStyle = "#ff69b4";
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+      ctx.fillStyle = "#ffe4e1";
+      ctx.fillRect(player.x+8, player.y+8, 16, 16);
+    }
+    function drawHUD() {
+      ctx.fillStyle = "#000";
+      ctx.font = `16px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Score: " + Math.floor(score), 10, 22);
+      ctx.fillText("Level: " + level, 320, 22);
+      ctx.font = `12px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Best: " + Math.floor(bestScore), 10, 38);
+      // show pause indicator subtly
+      ctx.font = `12px ${FONT_STACK_BOLD}`;
+      if (paused) ctx.fillText("[Paused]", 10, 40);
+    }
+    // drawTouchControls removed
+    function drawGameOver() {
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.font = `36px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Game Over", canvas.width/2, canvas.height/2 - 20);
+      ctx.font = `20px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Score: " + Math.floor(score), canvas.width/2, canvas.height/2 + 8);
+      ctx.fillText("Level: " + level, canvas.width/2, canvas.height/2 + 32);
+      ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, canvas.height/2 + 56);
+
+      const btnW=110, btnH=44;
+      const btnX=canvas.width/2-btnW/2, btnY=canvas.height/2+72;
+      ctx.fillStyle="#222"; ctx.fillRect(btnX, btnY, btnW, btnH);
+      ctx.fillStyle="#fff"; ctx.font=`20px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Restart", canvas.width/2, btnY+btnH/2+7);
+
+      ctx.font=`16px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY+btnH+28);
+
+      ctx.textAlign="left";
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawScrollingSky();
+      for (let cloud of clouds) drawCloud(cloud);
+      drawGround();
+  drawPlayer();
+  drawParticles();
+    drawHUD();
+
+      if (levelUpPopup) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${levelUpPopup.alpha})`;
+        ctx.font = `28px ${FONT_STACK_BOLD}`;
+        ctx.textAlign = "center";
+        ctx.fillText(levelUpPopup.text, canvas.width/2, levelUpPopup.y);
+        ctx.textAlign = "left";
+      }
+
+      if (!gameRunning) drawGameOver();
+    }
+
+    // -------- loop --------
+    let lastTime = performance.now();
+    function frame(now) {
+      const dt = now - lastTime; lastTime = now;
+      update(isNaN(dt) ? 16 : dt);
+      draw();
+      requestAnimationFrame(frame);
+    }
+
+    // Initialize music and start game loop
+    initMusic();
+    restartGame();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
