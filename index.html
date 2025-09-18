@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Cloud Jump</title>
   <script src="https://w.soundcloud.com/player/api.js"></script>
   <style>
@@ -15,7 +16,7 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
     }
     #titleImage {
       width: 400px;
@@ -95,6 +96,15 @@
       clip-path: none; /* ensure no polygon shape leaks onto jump */
     }
     .ctrl-btn:active { filter: brightness(1.15); }
+
+    /* Mobile-friendly layout: let elements span full width and canvas fill viewport remainder */
+    @media (max-width: 600px) {
+      body { align-items: stretch; justify-content: flex-start; }
+      #titleImage, #musicbar, #controls { width: 100vw; max-width: 100vw; }
+      #musicbar { box-sizing: border-box; padding: 0 12px; }
+      /* Canvas width will be set via JS for pixel-perfect scaling; this is a fallback */
+      canvas { width: 100vw; height: auto; }
+    }
   </style>
 </head>
 <body>
@@ -124,6 +134,44 @@
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+    const titleImgEl = document.getElementById('titleImage');
+    const musicBarEl = document.getElementById('musicbar');
+    const controlsEl = document.getElementById('controls');
+
+    // Responsive sizing: fill available viewport between title and controls
+  function sizeCanvasToViewport() {
+      // Use visualViewport when available to account for mobile browser UI
+      const vw = (window.visualViewport?.width || window.innerWidth);
+      const vh = (window.visualViewport?.height || window.innerHeight);
+
+      // Measure occupied vertical space (title + music bar + margins)
+      const titleH = titleImgEl?.offsetHeight || 0;
+      const musicH = musicBarEl?.offsetHeight || 0;
+      const controlsH = controlsEl?.offsetHeight || 0;
+  const bodyGap = 8; // approximate small gaps/margins around sections
+
+      // Available height for canvas: viewport minus occupied elements and small gaps
+      const availableH = Math.max(200, vh - (titleH + musicH + controlsH + bodyGap * 3));
+
+  const isSmall = vw <= 600;
+  // Width/Height rules: on small screens, fill width and available height; on desktop, keep original 400x600
+  const targetW = isSmall ? vw : 400;
+  const targetH = isSmall ? availableH : 600;
+
+      // Set CSS size for layout
+      canvas.style.width = targetW + 'px';
+      canvas.style.height = targetH + 'px';
+
+      // Use logical pixel dimensions for internal canvas to keep physics in sync
+      const logicalW = Math.round(targetW);
+      const logicalH = Math.round(targetH);
+      if (canvas.width !== logicalW || canvas.height !== logicalH) {
+        canvas.width = logicalW;
+        canvas.height = logicalH;
+        // Reset any transforms after resize
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+    }
 
     // Shared font stack to match level-up indication style
     const FONT_STACK_BOLD = 'Arial Black, Arial, Helvetica, sans-serif';
@@ -787,9 +835,22 @@
     }
 
     // Initialize music and start game loop
-    initMusic();
-    restartGame();
-    requestAnimationFrame(frame);
+    function bootstrap() {
+      sizeCanvasToViewport();
+      initMusic();
+      restartGame();
+      requestAnimationFrame(frame);
+    }
+    // Resize handlers
+    window.addEventListener('resize', sizeCanvasToViewport);
+    window.visualViewport?.addEventListener('resize', sizeCanvasToViewport);
+    window.addEventListener('orientationchange', () => setTimeout(sizeCanvasToViewport, 100));
+    // Kick off after layout settles
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setTimeout(bootstrap, 0);
+    } else {
+      window.addEventListener('DOMContentLoaded', () => setTimeout(bootstrap, 0));
+    }
   </script>
 </body>
 </html>
