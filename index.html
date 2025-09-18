@@ -148,10 +148,11 @@
       }
       #topbar, #controls { width: 100%; max-width: 100%; box-sizing: border-box; }
       /* Place title and musicbar side-by-side on mobile */
-      #topbar { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+      #topbar { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
       /* Half-size title image */
       #titleImage { width: 200px; max-width: 40vw; margin-bottom: 0; }
-      #musicbar { margin-bottom: 0; box-sizing: border-box; padding: 0 0; gap: 8px; }
+      /* Right-align music player so its right edge aligns with canvas right edge */
+      #musicbar { margin-left: auto; margin-bottom: 0; box-sizing: border-box; padding: 0 0; gap: 8px; justify-content: flex-end; }
       /* Increase separation between arrow group and jump button */
       #controls { gap: 80px; }
       /* Canvas width will be set via JS; fallback respects body padding */
