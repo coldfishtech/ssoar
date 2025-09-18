@@ -35,6 +35,15 @@
       -webkit-user-drag: none;
       user-select: none;
     }
+    /* topbar wraps title + musicbar */
+    #topbar {
+      width: 400px;
+      max-width: 90vw;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
     /* simple music bar under the title */
     #musicbar {
       width: 400px;
@@ -137,8 +146,12 @@
         padding-bottom: 72px; /* fallback */
         padding-bottom: calc(72px + env(safe-area-inset-bottom)); /* add safe-area if present */
       }
-      #titleImage, #musicbar, #controls { width: 100%; max-width: 100%; box-sizing: border-box; }
-      #musicbar { box-sizing: border-box; padding: 0 12px; }
+      #topbar, #controls { width: 100%; max-width: 100%; box-sizing: border-box; }
+      /* Place title and musicbar side-by-side on mobile */
+      #topbar { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+      /* Half-size title image */
+      #titleImage { width: 200px; max-width: 40vw; margin-bottom: 0; }
+      #musicbar { margin-bottom: 0; box-sizing: border-box; padding: 0 0; gap: 8px; }
       /* Increase separation between arrow group and jump button */
       #controls { gap: 80px; }
       /* Canvas width will be set via JS; fallback respects body padding */
@@ -147,22 +160,24 @@
   </style>
 </head>
 <body>
-  <img id="titleImage" src="ssoar_title.png" alt="SSOAR Title" />
-  <div id="musicbar" aria-label="Music Player">
-    <span id="music-label">BGM</span>
-    <svg id="music-icon" viewBox="0 0 24 24" aria-label="Play BGM" title="Play/Pause BGM" tabindex="-1" role="button" class="disabled" data-state="paused">
-      <path id="music-icon-path" fill="#000" d="M8 5v14l11-7z"/>
-    </svg>
-  <canvas id="music-scope" width="60" height="16" aria-hidden="true"></canvas>
-    <!-- hidden SoundCloud widget iframe used for playback/control -->
-    <iframe
-      id="sc-widget"
-      allow="autoplay"
-      scrolling="no"
-      frameborder="no"
-      style="position:absolute; left:-9999px; width:0; height:0; border:0;"
-      src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/user-385939006/01-ddd&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&visual=false">
-    </iframe>
+  <div id="topbar">
+    <img id="titleImage" src="ssoar_title.png" alt="SSOAR Title" />
+    <div id="musicbar" aria-label="Music Player">
+      <span id="music-label">BGM</span>
+      <svg id="music-icon" viewBox="0 0 24 24" aria-label="Play BGM" title="Play/Pause BGM" tabindex="-1" role="button" class="disabled" data-state="paused">
+        <path id="music-icon-path" fill="#000" d="M8 5v14l11-7z"/>
+      </svg>
+      <canvas id="music-scope" width="60" height="16" aria-hidden="true"></canvas>
+      <!-- hidden SoundCloud widget iframe used for playback/control -->
+      <iframe
+        id="sc-widget"
+        allow="autoplay"
+        scrolling="no"
+        frameborder="no"
+        style="position:absolute; left:-9999px; width:0; height:0; border:0;"
+        src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/user-385939006/01-ddd&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&visual=false">
+      </iframe>
+    </div>
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
   <!-- Desktop instructions (hidden on touch devices) -->
@@ -188,8 +203,8 @@
       return vw <= 600;
     }
     let IS_TOUCH = computeIsMobile();
-    const titleImgEl = document.getElementById('titleImage');
-    const musicBarEl = document.getElementById('musicbar');
+  const titleImgEl = document.getElementById('titleImage');
+  const topbarEl = document.getElementById('topbar');
     const controlsEl = document.getElementById('controls');
   const desktopInstrEl = document.getElementById('desktop-instructions');
 
@@ -200,8 +215,9 @@
   const vh = (window.visualViewport?.height || window.innerHeight);
 
       // Measure occupied vertical space (title + music bar + margins)
-      const titleH = titleImgEl?.offsetHeight || 0;
-      const musicH = musicBarEl?.offsetHeight || 0;
+  const titleH = 0; // title is measured as part of the topbar
+  const musicH = 0; // music bar measured via topbar
+  const topbarH = topbarEl?.offsetHeight || 0;
   const controlsH = controlsEl?.offsetHeight || 0;
   const instrH = desktopInstrEl?.offsetHeight || 0;
   // Account for mobile padding (12px per side via CSS). Use computed style to be accurate.
@@ -213,7 +229,7 @@
   const bodyGap = 8; // small gaps between sections
 
       // Available height for canvas: viewport minus occupied elements and small gaps
-  const availableH = Math.max(200, vh - (padTop + padBottom + titleH + musicH + controlsH + instrH + bodyGap * 4));
+  const availableH = Math.max(200, vh - (padTop + padBottom + topbarH + controlsH + instrH + bodyGap * 4));
 
   const isSmall = vw <= 600;
   // Width/Height rules: on small screens, fill width and available height; on desktop, keep original 400x600
