@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Cloud Jump</title>
+  <title>SSOAR: Touch the Sky</title>
   <script src="https://w.soundcloud.com/player/api.js"></script>
   <style>
     html {
@@ -23,6 +23,8 @@
       -webkit-user-select: none;
       user-select: none;
       -webkit-touch-callout: none;
+      /* Disable vertical dragging, allow only horizontal gestures */
+      touch-action: pan-x;
     }
     #titleImage {
       width: 400px;
@@ -45,22 +47,24 @@
       font-family: Arial Black, Arial, Helvetica, sans-serif;
       font-weight: 900;
     }
-    #music-btn {
+  /* SVG play/pause icon (black) */
+  #music-icon { width: 16px; height: 16px; cursor: pointer; display: inline-block; }
+    #music-icon.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+    /* Ensure the label matches the icon/scope height visually */
+    #music-label {
+      font-family: Arial Black, Arial, Helvetica, sans-serif;
+      font-weight: 900;
+      font-size: 12px;
+      color: #222;
       height: 28px;
-      width: 44px;
-      display: inline-flex; align-items: center; justify-content: center;
-      border: 1px solid #b0b7c2; border-radius: 4px;
-      background: #222; color: #fff; cursor: pointer;
-      padding: 0; min-width: 44px;
-      font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: 12px;
+      display: inline-flex;
+      align-items: center;
     }
-    #music-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
-    #music-label { font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: 12px; color: #222; }
     /* Tiny frequency visualizer next to the music button */
     #music-scope {
       display: inline-block;
       width: 60px;
-      height: 16px;
+      height: 16px; /* match icon height */
       background: transparent;
       border: none !important; /* override global canvas border */
       box-shadow: none;
@@ -137,8 +141,10 @@
   <img id="titleImage" src="ssoar_title.png" alt="SSOAR Title" />
   <div id="musicbar" aria-label="Music Player">
     <span id="music-label">BGM</span>
-    <button id="music-btn" type="button" aria-label="Play BGM" title="Play/Pause BGM" disabled tabindex="-1"></button>
-    <canvas id="music-scope" width="60" height="16" aria-hidden="true"></canvas>
+    <svg id="music-icon" viewBox="0 0 24 24" aria-label="Play BGM" title="Play/Pause BGM" tabindex="-1" role="button" class="disabled" data-state="paused">
+      <path id="music-icon-path" fill="#000" d="M8 5v14l11-7z"/>
+    </svg>
+  <canvas id="music-scope" width="60" height="16" aria-hidden="true"></canvas>
     <!-- hidden SoundCloud widget iframe used for playback/control -->
     <iframe
       id="sc-widget"
@@ -213,7 +219,8 @@
     // --- Simple SoundCloud music player (hidden iframe) ---
     let scWidget = null;
   const scIframe = document.getElementById('sc-widget');
-  const musicBtn = document.getElementById('music-btn');
+  const musicIcon = document.getElementById('music-icon');
+  const musicIconPath = document.getElementById('music-icon-path');
     const musicScope = document.getElementById('music-scope');
     const scopeCtx = musicScope?.getContext('2d') || null;
     let scopeAnimId = null;
@@ -227,7 +234,7 @@
       const bars = 6;
       const gap = 2;
       const bw = Math.floor((w - gap * (bars - 1)) / bars);
-      const isPlaying = musicBtn?.dataset.state === 'playing';
+  const isPlaying = musicIcon?.dataset.state === 'playing';
       const minPx = 2; // minimal height for paused bars
       for (let i = 0; i < bars; i++) {
         // When paused, show uniform minimal bars; when playing, vary heights over time
@@ -267,33 +274,41 @@
         scReady = true;
         // Ensure we start paused by default
         try { scWidget.pause(); } catch(e) {}
-        if (musicBtn) {
-          musicBtn.disabled = false;
-          musicBtn.dataset.state = 'paused';
-          musicBtn.textContent = '▶';
-          musicBtn.setAttribute('aria-label', 'Play BGM');
-          musicBtn.title = 'Play BGM';
+        if (musicIcon) {
+          musicIcon.classList.remove('disabled');
+          musicIcon.dataset.state = 'paused';
+          musicIcon.setAttribute('aria-label', 'Play BGM');
+          musicIcon.title = 'Play BGM';
+          if (musicIconPath) musicIconPath.setAttribute('d', 'M8 5v14l11-7z'); // play triangle
         }
         // Initialize scope drawing (paused state baseline)
         startScope();
       });
 
-      musicBtn?.addEventListener('click', () => {
+      // Loop the same track when it finishes
+      scWidget.bind(SC.Widget.Events.FINISH, () => {
+        try {
+          scWidget.seekTo(0);
+          if (musicIcon?.dataset.state === 'playing') scWidget.play();
+        } catch(e) {}
+      });
+
+      musicIcon?.addEventListener('click', () => {
         if (!scReady) return;
-        const isPaused = musicBtn.dataset.state !== 'playing';
+        const isPaused = musicIcon.dataset.state !== 'playing';
         if (isPaused) {
           scWidget.play();
-          musicBtn.dataset.state = 'playing';
-          musicBtn.textContent = '⏸';
-          musicBtn.setAttribute('aria-label', 'Pause BGM');
-          musicBtn.title = 'Pause BGM';
+          musicIcon.dataset.state = 'playing';
+          musicIcon.setAttribute('aria-label', 'Pause BGM');
+          musicIcon.title = 'Pause BGM';
+          if (musicIconPath) musicIconPath.setAttribute('d', 'M6 5h4v14H6zM14 5h4v14h-4z'); // pause bars
           startScope();
         } else {
           scWidget.pause();
-          musicBtn.dataset.state = 'paused';
-          musicBtn.textContent = '▶';
-          musicBtn.setAttribute('aria-label', 'Play BGM');
-          musicBtn.title = 'Play BGM';
+          musicIcon.dataset.state = 'paused';
+          musicIcon.setAttribute('aria-label', 'Play BGM');
+          musicIcon.title = 'Play BGM';
+          if (musicIconPath) musicIconPath.setAttribute('d', 'M8 5v14l11-7z'); // play triangle
           // Stop moving the scope (leave baseline)
           // We don't cancel the RAF entirely to keep the baseline drawn; stop motion by not advancing
           // but simpler: stop RAF and draw one paused frame
@@ -302,7 +317,7 @@
       });
 
       // While loading: leave button disabled
-      if (musicBtn) { musicBtn.disabled = true; musicBtn.textContent = '▶'; }
+      if (musicIcon) { musicIcon.classList.add('disabled'); }
     }
     // Removed setMuted; we no longer support mute, only play/pause
 
@@ -356,7 +371,7 @@
   let paused = false;
     // --- particles ---
     const particles = [];
-    function spawnPuff(x, y, count = 6, color = "#ffffff") {
+    function spawnPuff(x, y, count = 6, color = "#000000") {
       for (let i = 0; i < count; i++) {
         particles.push({
           x, y,
@@ -521,8 +536,12 @@
       el.addEventListener('mouseleave', () => onPress(false));
     }
 
-    bindControl(btnLeft, (down) => { keys["ArrowLeft"] = !!down; });
-    bindControl(btnRight, (down) => { keys["ArrowRight"] = !!down; });
+    // On touch devices, we'll use the arrow group horizontal sweep control;
+    // keep individual button bindings only for non-touch (mouse) usage.
+    if (!IS_TOUCH) {
+      bindControl(btnLeft, (down) => { keys["ArrowLeft"] = !!down; });
+      bindControl(btnRight, (down) => { keys["ArrowRight"] = !!down; });
+    }
     bindControl(btnJump, (down) => {
       if (down) {
         jumpBufferTimer = JUMP_BUFFER; // buffer jump
@@ -538,6 +557,7 @@
     if (arrowGroup && btnLeft && btnRight) {
       let activeDir = null; // 'left' | 'right' | null
       let captured = false;
+      let midX = null; // horizontal threshold for left/right
 
       // Avoid text selection/start drag when interacting with the arrow area
       arrowGroup.addEventListener('mousedown', (e) => { e.preventDefault(); });
@@ -553,36 +573,48 @@
         activeDir = dir;
       }
 
-      function dirFromPoint(clientX, clientY) {
+      function dirFromPoint(clientX) {
+        // Determine left/right based on position relative to the group midpoint
         const rect = arrowGroup.getBoundingClientRect();
-        const mid = rect.left + rect.width / 2;
-        if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+        const mid = (midX != null) ? midX : (rect.left + rect.width / 2);
         return clientX < mid ? 'left' : 'right';
       }
 
       arrowGroup.addEventListener('pointerdown', (e) => {
         arrowGroup.setPointerCapture?.(e.pointerId);
         captured = true;
-        const dir = dirFromPoint(e.clientX, e.clientY);
+        // Cache the midpoint at gesture start
+        const rect = arrowGroup.getBoundingClientRect();
+        midX = rect.left + rect.width / 2;
+        const dir = dirFromPoint(e.clientX);
         setDir(dir);
         e.preventDefault();
       });
-      arrowGroup.addEventListener('pointermove', (e) => {
+      const onMove = (e) => {
         if (!captured) return;
-        const dir = dirFromPoint(e.clientX, e.clientY);
+        const dir = dirFromPoint(e.clientX);
         setDir(dir);
         e.preventDefault();
-      });
+      };
+      const onUp = (e) => {
+        if (!captured) return;
+        endSlide();
+        e.preventDefault();
+      };
+      arrowGroup.addEventListener('pointermove', onMove);
+      window.addEventListener('pointermove', onMove);
       function endSlide() {
         captured = false;
+        midX = null;
         activeDir = null;
         keys["ArrowLeft"] = false;
         keys["ArrowRight"] = false;
       }
-      arrowGroup.addEventListener('pointerup', (e) => { endSlide(); e.preventDefault(); });
-      arrowGroup.addEventListener('pointercancel', (e) => { endSlide(); e.preventDefault(); });
+  arrowGroup.addEventListener('pointerup', onUp);
+  window.addEventListener('pointerup', onUp);
+  arrowGroup.addEventListener('pointercancel', onUp);
+  window.addEventListener('pointercancel', onUp);
       arrowGroup.addEventListener('lostpointercapture', endSlide);
-      arrowGroup.addEventListener('mouseleave', endSlide);
     }
 
     function restartGame() {
@@ -646,8 +678,8 @@
         spaceHeld = keys["Space"]; // prevent immediate re-trigger while held
         jumpBufferTimer = 0; // consume buffer
         beep(660, 90, "square", 0.04); // jump SFX
-        // jump puff
-        spawnPuff(player.x + player.width/2, player.y + player.height, 6, "#ffffff");
+        // jump puff (black)
+        spawnPuff(player.x + player.width/2, player.y + player.height, 6);
       }
 
       // Time-based physics: scale by delta where appropriate
@@ -669,7 +701,7 @@
         player.y = ground.y - player.height;
         player.canJump = true;
         if (!wasCanJump) beep(220, 60, "sine", 0.03); // land SFX
-        if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 8, "#e6f7ff");
+        if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 8);
       }
 
       for (let cloud of clouds) {
@@ -684,7 +716,7 @@
           player.canJump = true;
           onCloud = cloud;
           if (!wasCanJump) beep(220, 60, "sine", 0.03); // land SFX
-          if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 6, "#f0f8ff");
+          if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 6);
         }
       }
 
@@ -850,9 +882,9 @@
       ctx.fillRect(ground.x, ground.y, ground.width, 3);
     }
     function drawPlayer() {
-      ctx.fillStyle = "#ff69b4";
+      ctx.fillStyle = "#000000";
       ctx.fillRect(player.x, player.y, player.width, player.height);
-      ctx.fillStyle = "#ffe4e1";
+      ctx.fillStyle = "#000000";
       ctx.fillRect(player.x+8, player.y+8, 16, 16);
     }
     function drawHUD() {
