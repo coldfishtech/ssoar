@@ -44,7 +44,7 @@
       align-items: center;
       gap: 8px;
     }
-    /* simple music bar under the title */
+  /* music bar (under title on desktop; next to it on mobile) */
     #musicbar {
       width: 400px;
       max-width: 90vw;
@@ -87,7 +87,7 @@
       -webkit-tap-highlight-color: transparent;
       touch-action: none; /* avoid scrolling/zoom while dragging on canvas */
     }
-    /* always-visible controls under the canvas */
+  /* Controls under the canvas (shown on mobile) */
     #controls {
       display: flex;
       gap: 10px;
@@ -222,7 +222,7 @@
   const topbarH = topbarEl?.offsetHeight || 0;
   const controlsH = controlsEl?.offsetHeight || 0;
   const instrH = desktopInstrEl?.offsetHeight || 0;
-  // Account for mobile padding (12px per side via CSS). Use computed style to be accurate.
+  // Account for body padding defined in CSS (e.g., 24px and safe-area). Use computed style to be accurate.
   const cs = getComputedStyle(document.body);
   const padTop = parseFloat(cs.paddingTop) || 0;
   const padBottom = parseFloat(cs.paddingBottom) || 0;
@@ -258,7 +258,7 @@
       }
     }
 
-    // Shared font stack to match level-up indication style
+  // Shared bold font stack for HUD/overlays
     const FONT_STACK_BOLD = 'Arial Black, Arial, Helvetica, sans-serif';
   const INSTR_TEXT = 'Use \u2190 and \u2192 to move. Press Space to jump.'; // ← →
 
@@ -558,7 +558,7 @@
       };
     }
 
-  // (reverted) no top spawn tracker
+  // Clouds are spawned with initial spacing; no top-spawn tracker is used
 
     function initClouds() {
       clouds = [];
@@ -1016,7 +1016,7 @@
       ctx.font = `32px ${FONT_STACK_BOLD}`;
       ctx.textAlign = 'left';
       ctx.fillText(String(Math.floor(score)), 10, 30);
-      // Add margin before Best line (reduced spacing)
+  // Best line
       ctx.font = `12px ${FONT_STACK_BOLD}`;
       ctx.fillText("Best: " + Math.floor(bestScore), 10, 44);
       // show pause indicator subtly below Best
@@ -1031,11 +1031,11 @@
       ctx.textAlign = "center";
       ctx.font = `36px ${FONT_STACK_BOLD}`;
     ctx.fillText("Game Over", canvas.width/2, canvas.height/2 - 20);
-  // Show only the score number, 1.5x larger than before (30px)
+  // Show the score number (30px)
   ctx.font = `30px ${FONT_STACK_BOLD}`;
-  // Equalize vertical spacing: title→score and score→best both 36px; slightly reduce title→score
+  // Balanced vertical spacing between title, score, and best
   ctx.fillText(String(Math.floor(score)), canvas.width/2, canvas.height/2 + 16);
-  // Move Best slightly further down to keep spacing from the larger score
+  // Best below the score
   ctx.font = `20px ${FONT_STACK_BOLD}`;
   ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, canvas.height/2 + 52);
 
