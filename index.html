@@ -181,7 +181,7 @@
     </div>
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
-  <!-- Desktop instructions (hidden on touch devices) -->
+  <!-- Desktop instructions (hidden on mobile) -->
   <div id="desktop-instructions" aria-hidden="true" style="display:none;"></div>
   <div id="controls" aria-label="Game Controls">
     <div id="arrow-group" class="ctrl-group-arrows" aria-label="Directional Controls">
@@ -193,9 +193,9 @@
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-  // Render-time zoom (uniform) — apply only on mobile
+  // Render-time zoom (uniform) — apply only on mobile-sized viewports
   const CAMERA_ZOOM = 1.2; // show ~1.2x more (zoom out on mobile)
-  function getDrawScale() { return IS_TOUCH ? (1 / CAMERA_ZOOM) : 1; }
+  function getDrawScale() { return isMobile ? (1 / CAMERA_ZOOM) : 1; }
   function viewWidth() { return canvas.width / getDrawScale(); }
   function viewHeight() { return canvas.height / getDrawScale(); }
     // Determine mobile/desktop purely by viewport width (matching the CSS breakpoint)
@@ -203,7 +203,8 @@
       const vw = (window.visualViewport?.width || window.innerWidth);
       return vw <= 600;
     }
-    let IS_TOUCH = computeIsMobile();
+  // Width-based mobile flag (<= 600px)
+  let isMobile = computeIsMobile();
   const titleImgEl = document.getElementById('titleImage');
   const topbarEl = document.getElementById('topbar');
     const controlsEl = document.getElementById('controls');
@@ -386,8 +387,8 @@
     }
     // Setup desktop vs mobile UI elements (controls vs instructions)
     function setupInputUI() {
-      if (IS_TOUCH) {
-        // Mobile/tablet: show controls, hide desktop instructions
+      if (isMobile) {
+        // Mobile: show on-screen controls, hide desktop instructions
         controlsEl.style.display = 'flex';
         desktopInstrEl.style.display = 'none';
       } else {
@@ -400,11 +401,7 @@
         desktopInstrEl.style.fontSize = '14px';
         desktopInstrEl.style.color = '#000';
         desktopInstrEl.textContent = INSTR_TEXT;
-        if (!desktopButtonsBound) {
-          bindControl(btnLeft, (down) => { keys["ArrowLeft"] = !!down; });
-          bindControl(btnRight, (down) => { keys["ArrowRight"] = !!down; });
-          desktopButtonsBound = true;
-        }
+        // On desktop, keyboard is the primary input.
       }
     }
     // Removed setMuted; we no longer support mute, only play/pause
@@ -1048,8 +1045,8 @@
       ctx.fillStyle="#fff"; ctx.font=`20px ${FONT_STACK_BOLD}`;
       ctx.fillText("Restart", canvas.width/2, btnY+btnH/2+7);
 
-      // Only show keyboard hint on non-touch devices
-      if (!IS_TOUCH) {
+      // Only show keyboard hint on desktop
+      if (!isMobile) {
         ctx.font=`16px ${FONT_STACK_BOLD}`;
         ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY+btnH+28);
       }
@@ -1128,8 +1125,8 @@
     // Resize handlers: refresh UI mode by width and resize canvas
     function refreshUIMode() {
       const newIsMobile = computeIsMobile();
-      if (newIsMobile !== IS_TOUCH) {
-        IS_TOUCH = newIsMobile;
+      if (newIsMobile !== isMobile) {
+        isMobile = newIsMobile;
         setupInputUI();
       }
       sizeCanvasToViewport();
