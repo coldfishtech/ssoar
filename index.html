@@ -1012,16 +1012,13 @@
     }
     function drawHUD() {
       ctx.fillStyle = "#000";
-      // Draw just the score number, twice as big as before (32px)
+      // Draw just the score number (32px)
       ctx.font = `32px ${FONT_STACK_BOLD}`;
       ctx.textAlign = 'left';
       ctx.fillText(String(Math.floor(score)), 10, 30);
-  // Best line
+      // show pause indicator below score
       ctx.font = `12px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Best: " + Math.floor(bestScore), 10, 44);
-      // show pause indicator subtly below Best
-      ctx.font = `12px ${FONT_STACK_BOLD}`;
-      if (paused) ctx.fillText("[Paused]", 10, 60);
+      if (paused) ctx.fillText("[Paused]", 10, 46);
     }
     // drawTouchControls removed
     function drawGameOver() {
