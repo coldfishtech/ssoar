@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>SSOAR: Touch the Sky</title>
   <script src="https://w.soundcloud.com/player/api.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     html {
       background: #f6f8fb; /* subtle cool off-white */
@@ -181,6 +182,26 @@
     </div>
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
+  
+  <!-- Leaderboard Modal -->
+  <div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;">
+      <h2 style="margin: 0 0 16px 0; font-family: Arial Black, Arial, sans-serif; text-align: center;">Leaderboard</h2>
+      <div id="score-submission" style="margin-bottom: 20px; text-align: center;">
+        <div style="margin-bottom: 12px; font-family: Arial Black, Arial, sans-serif; font-size: 18px;">
+          Your Score: <span id="final-score">0</span>
+        </div>
+        <input type="text" id="player-name" placeholder="Enter your name" maxlength="20" 
+               style="padding: 8px; font-size: 16px; border: 2px solid #ddd; border-radius: 4px; margin-right: 8px; width: 150px;">
+        <button id="submit-score" style="padding: 8px 16px; font-size: 16px; background: #222; color: white; border: none; border-radius: 4px; cursor: pointer;">Submit</button>
+      </div>
+      <div id="leaderboard-list"></div>
+      <div style="text-align: center; margin-top: 16px;">
+        <button id="close-leaderboard" style="padding: 8px 16px; font-size: 16px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Desktop instructions (hidden on mobile) -->
   <div id="desktop-instructions" aria-hidden="true" style="display:none;"></div>
   <div id="controls" aria-label="Game Controls">
@@ -191,6 +212,64 @@
     <button id="btn-jump" class="ctrl-btn ctrl-btn--jump" aria-label="Jump" title="Jump" tabindex="-1"></button>
   </div>
   <script>
+    // -------- Supabase Configuration --------
+    const SUPABASE_URL = 'https://yxwpfmkcdqenehspaguw.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4d3BmbWtjZHFlbmVoc3BhZ3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyODk1MTcsImV4cCI6MjA3NDg2NTUxN30.Bn2Zu9LX0qvURFU6h0oEKtXvbsPsLEnYWIoL1NHesqs';
+    
+    let supabaseClient = null;
+    let leaderboardEnabled = false;
+    
+    // Initialize Supabase client
+    function initSupabase() {
+      try {
+        if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
+          supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          leaderboardEnabled = true;
+          console.log('Supabase initialized');
+        }
+      } catch (error) {
+        console.warn('Supabase initialization failed:', error);
+        leaderboardEnabled = false;
+      }
+    }
+    
+    // Submit score to leaderboard
+    async function submitScore(playerName, finalScore) {
+      if (!leaderboardEnabled || !supabaseClient) return false;
+      
+      try {
+        const { data, error } = await supabaseClient
+          .from('leaderboard')
+          .insert([{ player_name: playerName, score: finalScore }]);
+        
+        if (error) throw error;
+        console.log('Score submitted:', finalScore);
+        return true;
+      } catch (error) {
+        console.error('Error submitting score:', error);
+        return false;
+      }
+    }
+    
+    // Get top scores from leaderboard
+    async function getTopScores(limit = 10) {
+      if (!leaderboardEnabled || !supabaseClient) return [];
+      
+      try {
+        const { data, error } = await supabaseClient
+          .from('leaderboard')
+          .select('player_name, score, created_at')
+          .order('score', { ascending: false })
+          .limit(limit);
+        
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+        return [];
+      }
+    }
+
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
   // Render-time zoom (uniform) — apply only on mobile-sized viewports
@@ -445,7 +524,11 @@
     // restart cooldown (ms)
     let restartCooldown = 0;
 
-  // NEW: track if space is currently held
+  // Leaderboard state
+  let showLeaderboardOnGameOver = false;
+  let leaderboardScoreSubmitted = false;
+
+  // Track if space is currently held
     let spaceHeld = false;
 
   // NEW: coyote time & jump buffer (ms)
@@ -731,6 +814,88 @@
       arrowGroup.addEventListener('lostpointercapture', endSlide);
     }
 
+    // -------- Leaderboard Functions --------
+    function showLeaderboard(finalScore) {
+      if (!leaderboardEnabled) return;
+      
+      const modal = document.getElementById('leaderboard-modal');
+      const finalScoreEl = document.getElementById('final-score');
+      const playerNameInput = document.getElementById('player-name');
+      const submitBtn = document.getElementById('submit-score');
+      const closeBtn = document.getElementById('close-leaderboard');
+      const scoreSubmissionDiv = document.getElementById('score-submission');
+      
+      finalScoreEl.textContent = finalScore;
+      modal.style.display = 'flex';
+      leaderboardScoreSubmitted = false;
+      
+      // Focus name input
+      setTimeout(() => playerNameInput.focus(), 100);
+      
+      // Load and display current leaderboard
+      loadLeaderboard();
+      
+      // Set up event listeners
+      submitBtn.onclick = async () => {
+        const playerName = playerNameInput.value.trim();
+        if (!playerName) {
+          alert('Please enter your name');
+          return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+        
+        const success = await submitScore(playerName, finalScore);
+        if (success) {
+          scoreSubmissionDiv.style.display = 'none';
+          leaderboardScoreSubmitted = true;
+          loadLeaderboard(); // Refresh leaderboard
+        } else {
+          alert('Failed to submit score. Please try again.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit';
+        }
+      };
+      
+      closeBtn.onclick = () => {
+        modal.style.display = 'none';
+      };
+      
+      // Submit on Enter key
+      playerNameInput.onkeypress = (e) => {
+        if (e.key === 'Enter') {
+          submitBtn.click();
+        }
+      };
+    }
+    
+    async function loadLeaderboard() {
+      const leaderboardList = document.getElementById('leaderboard-list');
+      leaderboardList.innerHTML = '<div style="text-align: center; color: #666;">Loading...</div>';
+      
+      const scores = await getTopScores(10);
+      
+      if (scores.length === 0) {
+        leaderboardList.innerHTML = '<div style="text-align: center; color: #666;">No scores yet. Be the first!</div>';
+        return;
+      }
+      
+      let html = '<div style="font-family: Arial Black, Arial, sans-serif; font-weight: bold; margin-bottom: 8px;">Top Scores:</div>';
+      scores.forEach((entry, index) => {
+        const rank = index + 1;
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+        html += `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;">
+            <span style="font-weight: bold;">${medal} ${entry.player_name}</span>
+            <span style="font-family: monospace;">${entry.score}</span>
+          </div>
+        `;
+      });
+      
+      leaderboardList.innerHTML = html;
+    }
+
     function restartGame() {
       ground.x = 0;
       ground.y = viewHeight() - groundHeight;
@@ -905,6 +1070,10 @@
           bestScore = score;
           try { localStorage.setItem("cloudjump_best", String(bestScore)); } catch(e) {}
         }
+        // Show leaderboard modal after a short delay
+        setTimeout(() => {
+          showLeaderboard(Math.floor(score));
+        }, 1000);
       }
 
       if (milestonePopup) {
@@ -1108,6 +1277,7 @@
 
     // Initialize music and start game loop
     function bootstrap() {
+      initSupabase();
       sizeCanvasToViewport();
       initMusic();
       setupInputUI();
