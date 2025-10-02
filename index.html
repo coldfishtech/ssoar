@@ -183,25 +183,6 @@
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
   
-  <!-- Leaderboard Modal -->
-  <div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
-    <div id="leaderboard-content" style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;">
-      <h2 style="margin: 0 0 16px 0; font-family: Arial Black, Arial, sans-serif; text-align: center;">Leaderboard</h2>
-      <div id="score-submission" style="margin-bottom: 20px; text-align: center;">
-        <div style="margin-bottom: 12px; font-family: Arial Black, Arial, sans-serif; font-size: 18px;">
-          Your Score: <span id="final-score">0</span>
-        </div>
-        <input type="text" id="player-name" placeholder="Enter your name" maxlength="20" 
-               style="padding: 8px; font-size: 16px; border: 2px solid #ddd; border-radius: 4px; margin-right: 8px; width: 150px;">
-        <button id="submit-score" style="padding: 8px 16px; font-size: 16px; background: #222; color: white; border: none; border-radius: 4px; cursor: pointer;">Submit</button>
-      </div>
-      <div id="leaderboard-list"></div>
-      <div style="text-align: center; margin-top: 16px;">
-        <button id="close-leaderboard" style="padding: 8px 16px; font-size: 16px; background: #666; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
-      </div>
-    </div>
-  </div>
-
   <!-- Desktop instructions (hidden on mobile) -->
   <div id="desktop-instructions" aria-hidden="true" style="display:none;"></div>
   <div id="controls" aria-label="Game Controls">
@@ -535,8 +516,10 @@
     let restartCooldown = 0;
 
   // Leaderboard state
-  let showLeaderboardOnGameOver = false;
-  let leaderboardScoreSubmitted = false;
+  let gameOverLeaderboardData = null;
+  let gameOverPlayerName = '';
+  let gameOverNameInputActive = false;
+  let gameOverScoreSubmitted = false;
 
   // Track if space is currently held
     let spaceHeld = false;
@@ -672,10 +655,44 @@
 
     // input
     window.addEventListener("keydown", e => {
+      // Handle name input during game over
+      if (!gameRunning && gameOverNameInputActive) {
+        if (e.code === "Enter") {
+          submitGameOverScore();
+          e.preventDefault();
+          return;
+        }
+        if (e.code === "Escape") {
+          gameOverNameInputActive = false;
+          e.preventDefault();
+          return;
+        }
+        if (e.code === "Backspace") {
+          gameOverPlayerName = gameOverPlayerName.slice(0, -1);
+          e.preventDefault();
+          return;
+        }
+        // Allow letters, numbers, and basic symbols
+        if (e.key.length === 1 && gameOverPlayerName.length < 20) {
+          const char = e.key;
+          if (/[a-zA-Z0-9\s_-]/.test(char)) {
+            gameOverPlayerName += char;
+          }
+        }
+        e.preventDefault();
+        return;
+      }
+      
       if (["ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
       keys[e.code] = true;
 
       if (!gameRunning && e.code === "Space") {
+        // If leaderboard is available and score not submitted, start name input
+        if (leaderboardEnabled && !gameOverScoreSubmitted && !gameOverNameInputActive) {
+          gameOverNameInputActive = true;
+          gameOverPlayerName = '';
+          return;
+        }
         restartGame();
         keys["Space"] = false;
         spaceHeld = true; // treat it as held after restart
@@ -706,9 +723,27 @@
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
+        
+        // Check for submit button click
+        if (leaderboardEnabled && !gameOverScoreSubmitted) {
+          const submitBtnW = 140, submitBtnH = 32;
+          const submitBtnX = canvas.width/2 - submitBtnW/2;
+          const submitBtnY = canvas.height/2 + 100;
+          if (mx >= submitBtnX && mx <= submitBtnX + submitBtnW && my >= submitBtnY && my <= submitBtnY + submitBtnH) {
+            if (!gameOverNameInputActive) {
+              gameOverNameInputActive = true;
+              gameOverPlayerName = '';
+            } else if (gameOverPlayerName.trim()) {
+              submitGameOverScore();
+            }
+            return;
+          }
+        }
+        
+        // Check for restart button click
         const btnW = 110, btnH = 44;
         const btnX = canvas.width/2 - btnW/2;
-        const btnY = canvas.height/2 + 72;
+        const btnY = canvas.height/2 + 150; // Moved down to make room for leaderboard
         if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH) {
           restartGame();
         }
@@ -825,121 +860,42 @@
     }
 
     // -------- Leaderboard Functions --------
-    function showLeaderboard(finalScore) {
-      // Only show leaderboard if properly configured and enabled
+    async function initGameOverLeaderboard() {
       if (!leaderboardEnabled || !supabaseClient) {
-        console.log('Leaderboard not available - Supabase not configured');
+        gameOverLeaderboardData = null;
         return;
       }
       
-      const modal = document.getElementById('leaderboard-modal');
-      const finalScoreEl = document.getElementById('final-score');
-      const playerNameInput = document.getElementById('player-name');
-      const submitBtn = document.getElementById('submit-score');
-      const closeBtn = document.getElementById('close-leaderboard');
-      const scoreSubmissionDiv = document.getElementById('score-submission');
+      gameOverPlayerName = '';
+      gameOverNameInputActive = false;
+      gameOverScoreSubmitted = false;
       
-      // Ensure elements exist before proceeding
-      if (!modal || !finalScoreEl || !playerNameInput || !submitBtn || !closeBtn) {
-        console.error('Leaderboard elements not found');
-        return;
+      // Load leaderboard data
+      try {
+        gameOverLeaderboardData = await getTopScores(5); // Show top 5 in game over screen
+      } catch (error) {
+        console.error('Failed to load leaderboard:', error);
+        gameOverLeaderboardData = [];
       }
-      
-      finalScoreEl.textContent = finalScore;
-      modal.style.display = 'flex';
-      leaderboardScoreSubmitted = false;
-      
-      // Reset submission form
-      scoreSubmissionDiv.style.display = 'block';
-      playerNameInput.value = '';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Submit';
-      
-      // Focus name input
-      setTimeout(() => playerNameInput.focus(), 100);
-      
-      // Load and display current leaderboard
-      loadLeaderboard();
-      
-      // Clear any existing event listeners to prevent duplicates
-      submitBtn.onclick = null;
-      closeBtn.onclick = null;
-      playerNameInput.onkeypress = null;
-      
-      // Set up event listeners
-      submitBtn.onclick = async () => {
-        const playerName = playerNameInput.value.trim();
-        if (!playerName) {
-          alert('Please enter your name');
-          return;
-        }
-        
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting...';
-        
-        const success = await submitScore(playerName, finalScore);
-        if (success) {
-          scoreSubmissionDiv.style.display = 'none';
-          leaderboardScoreSubmitted = true;
-          loadLeaderboard(); // Refresh leaderboard
-        } else {
-          alert('Failed to submit score. Please try again.');
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Submit';
-        }
-      };
-      
-      closeBtn.onclick = () => {
-        modal.style.display = 'none';
-      };
-      
-      // Close modal when clicking outside the content
-      modal.onclick = (e) => {
-        if (e.target === modal) {
-          modal.style.display = 'none';
-        }
-      };
-      
-      // Prevent closing when clicking inside the content
-      const leaderboardContent = document.getElementById('leaderboard-content');
-      if (leaderboardContent) {
-        leaderboardContent.onclick = (e) => {
-          e.stopPropagation();
-        };
-      }
-      
-      // Submit on Enter key
-      playerNameInput.onkeypress = (e) => {
-        if (e.key === 'Enter') {
-          submitBtn.click();
-        }
-      };
     }
     
-    async function loadLeaderboard() {
-      const leaderboardList = document.getElementById('leaderboard-list');
-      leaderboardList.innerHTML = '<div style="text-align: center; color: #666;">Loading...</div>';
-      
-      const scores = await getTopScores(10);
-      
-      if (scores.length === 0) {
-        leaderboardList.innerHTML = '<div style="text-align: center; color: #666;">No scores yet. Be the first!</div>';
-        return;
+    async function submitGameOverScore() {
+      if (!leaderboardEnabled || !supabaseClient || !gameOverPlayerName.trim()) {
+        return false;
       }
       
-      let html = '<div style="font-family: Arial Black, Arial, sans-serif; font-weight: bold; margin-bottom: 8px;">Top Scores:</div>';
-      scores.forEach((entry, index) => {
-        const rank = index + 1;
-        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
-        html += `
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #eee;">
-            <span style="font-weight: bold;">${medal} ${entry.player_name}</span>
-            <span style="font-family: monospace;">${entry.score}</span>
-          </div>
-        `;
-      });
-      
-      leaderboardList.innerHTML = html;
+      try {
+        const success = await submitScore(gameOverPlayerName.trim(), Math.floor(score));
+        if (success) {
+          gameOverScoreSubmitted = true;
+          // Refresh leaderboard data
+          gameOverLeaderboardData = await getTopScores(5);
+          return true;
+        }
+      } catch (error) {
+        console.error('Failed to submit score:', error);
+      }
+      return false;
     }
 
     function restartGame() {
@@ -954,6 +910,12 @@
 
   score = 0; gameRunning = true; bgOffset = 0; paused = false;
   MAX_CLOUD_SPACING = 150; BASE_CLOUD_SPEED = 1.2; milestonePopup = null; nextMilestone = 1000;
+
+      // Reset leaderboard state
+      gameOverLeaderboardData = null;
+      gameOverPlayerName = '';
+      gameOverNameInputActive = false;
+      gameOverScoreSubmitted = false;
 
       restartCooldown = 200;
       spaceHeld = false;
@@ -1116,10 +1078,8 @@
           bestScore = score;
           try { localStorage.setItem("cloudjump_best", String(bestScore)); } catch(e) {}
         }
-        // Show leaderboard modal after a short delay
-        setTimeout(() => {
-          showLeaderboard(Math.floor(score));
-        }, 1000);
+        // Initialize leaderboard data for game over screen
+        initGameOverLeaderboard();
       }
 
       if (milestonePopup) {
@@ -1241,29 +1201,100 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#fff";
       ctx.textAlign = "center";
+      
+      // Game Over title
       ctx.font = `36px ${FONT_STACK_BOLD}`;
-    ctx.fillText("Game Over", canvas.width/2, canvas.height/2 - 20);
-  // Show the score number (30px)
-  ctx.font = `30px ${FONT_STACK_BOLD}`;
-  // Balanced vertical spacing between title, score, and best
-  ctx.fillText(String(Math.floor(score)), canvas.width/2, canvas.height/2 + 16);
-  // Best below the score
-  ctx.font = `20px ${FONT_STACK_BOLD}`;
-  ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, canvas.height/2 + 52);
+      ctx.fillText("Game Over", canvas.width/2, canvas.height/2 - 120);
+      
+      // Current score
+      ctx.font = `30px ${FONT_STACK_BOLD}`;
+      ctx.fillText(String(Math.floor(score)), canvas.width/2, canvas.height/2 - 80);
+      
+      // Best score
+      ctx.font = `16px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, canvas.height/2 - 55);
+      
+      // Leaderboard section
+      if (leaderboardEnabled && gameOverLeaderboardData) {
+        let yPos = canvas.height/2 - 30;
+        
+        // Leaderboard title
+        ctx.font = `20px ${FONT_STACK_BOLD}`;
+        ctx.fillText("Top Scores", canvas.width/2, yPos);
+        yPos += 25;
+        
+        // Show top scores
+        ctx.font = `14px ${FONT_STACK_BOLD}`;
+        gameOverLeaderboardData.slice(0, 3).forEach((entry, index) => {
+          const rank = index + 1;
+          let medal;
+          if (rank === 1) medal = '🥇';
+          else if (rank === 2) medal = '🥈';
+          else medal = '🥉';
+          const text = `${medal} ${entry.player_name}: ${entry.score}`;
+          ctx.fillText(text, canvas.width/2, yPos);
+          yPos += 20;
+        });
+        
+        yPos += 10;
+        
+        // Score submission section
+        if (!gameOverScoreSubmitted) {
+          // Name input prompt/field
+          ctx.font = `16px ${FONT_STACK_BOLD}`;
+          if (!gameOverNameInputActive) {
+            ctx.fillText("Enter your name:", canvas.width/2, yPos);
+          } else {
+            const displayName = gameOverPlayerName + '|';
+            ctx.fillText(`Name: ${displayName}`, canvas.width/2, yPos);
+          }
+          yPos += 25;
+          
+          // Submit button
+          const submitBtnW = 140, submitBtnH = 32;
+          const submitBtnX = canvas.width/2 - submitBtnW/2;
+          const submitBtnY = yPos - 8;
+          ctx.fillStyle = gameOverNameInputActive && gameOverPlayerName.trim() ? "#228B22" : "#666";
+          ctx.fillRect(submitBtnX, submitBtnY, submitBtnW, submitBtnH);
+          ctx.fillStyle = "#fff";
+          ctx.font = `16px ${FONT_STACK_BOLD}`;
+          const submitText = gameOverNameInputActive ? "Submit Score" : "Click to Enter Name";
+          ctx.fillText(submitText, canvas.width/2, submitBtnY + submitBtnH/2 + 5);
+          yPos += 45;
+        } else {
+          ctx.font = `16px ${FONT_STACK_BOLD}`;
+          ctx.fillStyle = "#90EE90";
+          ctx.fillText("Score submitted!", canvas.width/2, yPos);
+          ctx.fillStyle = "#fff";
+          yPos += 30;
+        }
+      } else if (leaderboardEnabled) {
+        // Loading state
+        ctx.font = `16px ${FONT_STACK_BOLD}`;
+        ctx.fillText("Loading leaderboard...", canvas.width/2, canvas.height/2 - 10);
+      }
+      
+      // Restart button (moved down)
+      const btnW = 110, btnH = 44;
+      const btnX = canvas.width/2 - btnW/2;
+      const btnY = canvas.height/2 + 150;
+      ctx.fillStyle = "#222";
+      ctx.fillRect(btnX, btnY, btnW, btnH);
+      ctx.fillStyle = "#fff";
+      ctx.font = `20px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Restart", canvas.width/2, btnY + btnH/2 + 7);
 
-      const btnW=110, btnH=44;
-  const btnX=canvas.width/2-btnW/2, btnY=canvas.height/2+72;
-      ctx.fillStyle="#222"; ctx.fillRect(btnX, btnY, btnW, btnH);
-      ctx.fillStyle="#fff"; ctx.font=`20px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Restart", canvas.width/2, btnY+btnH/2+7);
-
-      // Only show keyboard hint on desktop
+      // Controls hint
+      ctx.font = `12px ${FONT_STACK_BOLD}`;
       if (!isMobile) {
-        ctx.font=`16px ${FONT_STACK_BOLD}`;
-        ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY+btnH+28);
+        if (leaderboardEnabled && !gameOverScoreSubmitted && !gameOverNameInputActive) {
+          ctx.fillText("SPACE: Enter Name  •  ENTER: Submit  •  ESC: Cancel", canvas.width/2, btnY + btnH + 20);
+        } else {
+          ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY + btnH + 20);
+        }
       }
 
-      ctx.textAlign="left";
+      ctx.textAlign = "left";
     }
 
     function draw() {
