@@ -184,8 +184,8 @@
   <canvas id="gameCanvas" width="400" height="600"></canvas>
   
   <!-- Leaderboard Modal -->
-  <div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;">
+  <div id="leaderboard-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;">
+    <div id="leaderboard-content" style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto;">
       <h2 style="margin: 0 0 16px 0; font-family: Arial Black, Arial, sans-serif; text-align: center;">Leaderboard</h2>
       <div id="score-submission" style="margin-bottom: 20px; text-align: center;">
         <div style="margin-bottom: 12px; font-family: Arial Black, Arial, sans-serif; font-size: 18px;">
@@ -222,10 +222,20 @@
     // Initialize Supabase client
     function initSupabase() {
       try {
+        // Check if Supabase is available globally
+        if (typeof supabase === 'undefined') {
+          console.warn('Supabase library not loaded');
+          leaderboardEnabled = false;
+          return;
+        }
+        
         if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
           supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
           leaderboardEnabled = true;
-          console.log('Supabase initialized');
+          console.log('Supabase initialized successfully');
+        } else {
+          console.log('Supabase credentials not configured - leaderboard disabled');
+          leaderboardEnabled = false;
         }
       } catch (error) {
         console.warn('Supabase initialization failed:', error);
@@ -816,7 +826,11 @@
 
     // -------- Leaderboard Functions --------
     function showLeaderboard(finalScore) {
-      if (!leaderboardEnabled) return;
+      // Only show leaderboard if properly configured and enabled
+      if (!leaderboardEnabled || !supabaseClient) {
+        console.log('Leaderboard not available - Supabase not configured');
+        return;
+      }
       
       const modal = document.getElementById('leaderboard-modal');
       const finalScoreEl = document.getElementById('final-score');
@@ -825,15 +839,32 @@
       const closeBtn = document.getElementById('close-leaderboard');
       const scoreSubmissionDiv = document.getElementById('score-submission');
       
+      // Ensure elements exist before proceeding
+      if (!modal || !finalScoreEl || !playerNameInput || !submitBtn || !closeBtn) {
+        console.error('Leaderboard elements not found');
+        return;
+      }
+      
       finalScoreEl.textContent = finalScore;
       modal.style.display = 'flex';
       leaderboardScoreSubmitted = false;
+      
+      // Reset submission form
+      scoreSubmissionDiv.style.display = 'block';
+      playerNameInput.value = '';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit';
       
       // Focus name input
       setTimeout(() => playerNameInput.focus(), 100);
       
       // Load and display current leaderboard
       loadLeaderboard();
+      
+      // Clear any existing event listeners to prevent duplicates
+      submitBtn.onclick = null;
+      closeBtn.onclick = null;
+      playerNameInput.onkeypress = null;
       
       // Set up event listeners
       submitBtn.onclick = async () => {
@@ -861,6 +892,21 @@
       closeBtn.onclick = () => {
         modal.style.display = 'none';
       };
+      
+      // Close modal when clicking outside the content
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          modal.style.display = 'none';
+        }
+      };
+      
+      // Prevent closing when clicking inside the content
+      const leaderboardContent = document.getElementById('leaderboard-content');
+      if (leaderboardContent) {
+        leaderboardContent.onclick = (e) => {
+          e.stopPropagation();
+        };
+      }
       
       // Submit on Enter key
       playerNameInput.onkeypress = (e) => {
