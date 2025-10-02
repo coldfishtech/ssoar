@@ -261,6 +261,23 @@
       }
     }
 
+    async function getUserRank(userScore) {
+      if (!leaderboardEnabled || !supabaseClient) return null;
+      
+      try {
+        const { count, error } = await supabaseClient
+          .from('leaderboard')
+          .select('*', { count: 'exact', head: true })
+          .gt('score', userScore);
+        
+        if (error) throw error;
+        return (count || 0) + 1; // Add 1 because rank is 1-based
+      } catch (error) {
+        console.error('Error fetching user rank:', error);
+        return null;
+      }
+    }
+
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
   // Render-time zoom (uniform) — apply only on mobile-sized viewports
@@ -474,8 +491,6 @@
         // On desktop, keyboard is the primary input.
       }
     }
-    // Removed setMuted; we no longer support mute, only play/pause
-
 
     // -------- core tunables --------
   // These base values are tuned for ~60fps; we scale by dt in code paths below where needed.
@@ -517,9 +532,12 @@
 
   // Leaderboard state
   let gameOverLeaderboardData = null;
-  let gameOverPlayerName = '';
-  let gameOverNameInputActive = false;
-  let gameOverScoreSubmitted = false;
+  let gameOverUserScoreEntry = null;
+  let gameOverUserRank = null;
+
+  // Player name management
+  let playerName = '';
+  let namePromptActive = false;
 
   // Track if space is currently held
     let spaceHeld = false;
@@ -655,28 +673,23 @@
 
     // input
     window.addEventListener("keydown", e => {
-      // Handle name input during game over
-      if (!gameRunning && gameOverNameInputActive) {
-        if (e.code === "Enter") {
-          submitGameOverScore();
-          e.preventDefault();
-          return;
-        }
-        if (e.code === "Escape") {
-          gameOverNameInputActive = false;
+      // Handle name prompt during initial setup
+      if (namePromptActive) {
+        if (e.code === "Enter" && playerName.trim()) {
+          submitPlayerName();
           e.preventDefault();
           return;
         }
         if (e.code === "Backspace") {
-          gameOverPlayerName = gameOverPlayerName.slice(0, -1);
+          playerName = playerName.slice(0, -1);
           e.preventDefault();
           return;
         }
         // Allow letters, numbers, and basic symbols
-        if (e.key.length === 1 && gameOverPlayerName.length < 20) {
+        if (e.key.length === 1 && playerName.length < 20) {
           const char = e.key;
           if (/[a-zA-Z0-9\s_-]/.test(char)) {
-            gameOverPlayerName += char;
+            playerName += char;
           }
         }
         e.preventDefault();
@@ -687,12 +700,6 @@
       keys[e.code] = true;
 
       if (!gameRunning && e.code === "Space") {
-        // If leaderboard is available and score not submitted, start name input
-        if (leaderboardEnabled && !gameOverScoreSubmitted && !gameOverNameInputActive) {
-          gameOverNameInputActive = true;
-          gameOverPlayerName = '';
-          return;
-        }
         restartGame();
         keys["Space"] = false;
         spaceHeld = true; // treat it as held after restart
@@ -719,41 +726,57 @@
     });
 
     canvas.addEventListener("click", e => {
-      if (!gameRunning) {
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        
-        // Check for submit button click
-        if (leaderboardEnabled && !gameOverScoreSubmitted) {
-          const submitBtnW = 140, submitBtnH = 32;
-          const submitBtnX = canvas.width/2 - submitBtnW/2;
-          const submitBtnY = canvas.height/2 + 100;
-          if (mx >= submitBtnX && mx <= submitBtnX + submitBtnW && my >= submitBtnY && my <= submitBtnY + submitBtnH) {
-            if (!gameOverNameInputActive) {
-              gameOverNameInputActive = true;
-              gameOverPlayerName = '';
-            } else if (gameOverPlayerName.trim()) {
-              submitGameOverScore();
-            }
-            return;
-          }
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      
+      if (namePromptActive) {
+        // Check for Continue button click in name prompt
+        const btnW = 120, btnH = 40;
+        const btnX = canvas.width/2 - btnW/2;
+        const btnY = canvas.height/2 + 80;
+        if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH && playerName.trim().length > 0) {
+          submitPlayerName();
         }
-        
+      } else if (!gameRunning) {
         // Check for restart button click
         const btnW = 110, btnH = 44;
         const btnX = canvas.width/2 - btnW/2;
-        const btnY = canvas.height/2 + 150; // Moved down to make room for leaderboard
+        const btnY = getRestartButtonPosition();
         if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH) {
           restartGame();
         }
       }
     });
 
-    // On-canvas touch overlay removed; using HTML controls under the canvas.
+    // Also handle touch events for mobile
+    canvas.addEventListener("touchend", e => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.changedTouches[0];
+      const mx = touch.clientX - rect.left;
+      const my = touch.clientY - rect.top;
+      
+      if (namePromptActive) {
+        // Check for Continue button touch in name prompt
+        const btnW = 120, btnH = 40;
+        const btnX = canvas.width/2 - btnW/2;
+        const btnY = canvas.height/2 + 80;
+        if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH && playerName.trim().length > 0) {
+          submitPlayerName();
+        }
+      } else if (!gameRunning) {
+        // Check for restart button touch
+        const btnW = 110, btnH = 44;
+        const btnX = canvas.width/2 - btnW/2;
+        const btnY = getRestartButtonPosition();
+        if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH) {
+          restartGame();
+        }
+      }
+    });
 
-    // HTML controls (always visible under the canvas)
-  const btnLeft = document.getElementById('btn-left');
+    const btnLeft = document.getElementById('btn-left');
   const btnRight = document.getElementById('btn-right');
   const btnJump = document.getElementById('btn-jump');
   let desktopButtonsBound = false;
@@ -859,43 +882,128 @@
       arrowGroup.addEventListener('lostpointercapture', endSlide);
     }
 
-    // -------- Leaderboard Functions --------
-    async function initGameOverLeaderboard() {
-      if (!leaderboardEnabled || !supabaseClient) {
-        gameOverLeaderboardData = null;
+    // -------- Player Name Management --------
+    function loadPlayerName() {
+      try {
+        const saved = localStorage.getItem('cloudjump_player_name');
+        if (saved && saved.trim()) {
+          playerName = saved.trim();
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+    
+    function savePlayerName(name) {
+      try {
+        localStorage.setItem('cloudjump_player_name', name.trim());
+        playerName = name.trim();
+      } catch (e) {}
+    }
+    
+    function promptForName() {
+      if (!leaderboardEnabled) {
+        // Skip name prompt if leaderboard is disabled
         return;
       }
       
-      gameOverPlayerName = '';
-      gameOverNameInputActive = false;
-      gameOverScoreSubmitted = false;
-      
-      // Load leaderboard data
-      try {
-        gameOverLeaderboardData = await getTopScores(5); // Show top 5 in game over screen
-      } catch (error) {
-        console.error('Failed to load leaderboard:', error);
-        gameOverLeaderboardData = [];
-      }
+      namePromptActive = true;
+      playerName = '';
     }
-    
-    async function submitGameOverScore() {
-      if (!leaderboardEnabled || !supabaseClient || !gameOverPlayerName.trim()) {
-        return false;
+
+    // -------- Leaderboard Functions --------
+    async function initGameOverLeaderboard() {
+      if (!leaderboardEnabled || !supabaseClient || !playerName) {
+        gameOverLeaderboardData = null;
+        gameOverUserScoreEntry = null;
+        gameOverUserRank = null;
+        return;
       }
       
+      gameOverUserScoreEntry = null;
+      gameOverUserRank = null;
+      
+      // Automatically submit the score
       try {
-        const success = await submitScore(gameOverPlayerName.trim(), Math.floor(score));
+        const success = await submitScore(playerName, Math.floor(score));
         if (success) {
-          gameOverScoreSubmitted = true;
-          // Refresh leaderboard data
-          gameOverLeaderboardData = await getTopScores(5);
-          return true;
+          gameOverUserScoreEntry = {
+            player_name: playerName,
+            score: Math.floor(score),
+            created_at: new Date().toISOString()
+          };
         }
       } catch (error) {
         console.error('Failed to submit score:', error);
       }
-      return false;
+      
+      // Load leaderboard data (top 10)
+      try {
+        gameOverLeaderboardData = await getTopScores(10);
+      } catch (error) {
+        console.error('Failed to load leaderboard:', error);
+        gameOverLeaderboardData = [];
+      }
+      
+      // Get user's rank if score was submitted
+      if (gameOverUserScoreEntry) {
+        try {
+          gameOverUserRank = await getUserRank(gameOverUserScoreEntry.score);
+        } catch (error) {
+          console.error('Failed to get user rank:', error);
+          gameOverUserRank = null;
+        }
+      }
+    }
+
+    // Draw name prompt overlay
+    function drawNamePrompt() {
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      
+      ctx.font = `32px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Welcome to SSOAR!", canvas.width/2, canvas.height/2 - 60);
+      
+      ctx.font = `18px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Enter your name for the leaderboard:", canvas.width/2, canvas.height/2 - 20);
+      
+      // Name input field
+      const displayName = playerName + '|';
+      ctx.font = `24px ${FONT_STACK_BOLD}`;
+      ctx.fillText(displayName, canvas.width/2, canvas.height/2 + 20);
+      
+      // Instructions
+      ctx.font = `14px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Press ENTER to confirm or tap button below", canvas.width/2, canvas.height/2 + 60);
+      
+      // Continue button
+      const btnW = 120, btnH = 40;
+      const btnX = canvas.width/2 - btnW/2;
+      const btnY = canvas.height/2 + 80;
+      
+      // Check if name is valid for button state
+      const isNameValid = playerName.trim().length > 0;
+      
+      ctx.fillStyle = isNameValid ? "#4CAF50" : "#888";
+      ctx.fillRect(btnX, btnY, btnW, btnH);
+      ctx.strokeStyle = isNameValid ? "#45a049" : "#666";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(btnX, btnY, btnW, btnH);
+      
+      ctx.fillStyle = "#fff";
+      ctx.font = `16px ${FONT_STACK_BOLD}`;
+      ctx.fillText("Continue", canvas.width/2, btnY + btnH/2 + 6);
+      
+      ctx.textAlign = "left";
+    }
+
+    function submitPlayerName() {
+      if (playerName.trim().length > 0) {
+        savePlayerName(playerName.trim());
+        namePromptActive = false;
+      }
     }
 
     function restartGame() {
@@ -913,9 +1021,8 @@
 
       // Reset leaderboard state
       gameOverLeaderboardData = null;
-      gameOverPlayerName = '';
-      gameOverNameInputActive = false;
-      gameOverScoreSubmitted = false;
+      gameOverUserScoreEntry = null;
+      gameOverUserRank = null;
 
       restartCooldown = 200;
       spaceHeld = false;
@@ -1195,89 +1302,159 @@
       ctx.font = `12px ${FONT_STACK_BOLD}`;
       if (paused) ctx.fillText("[Paused]", 10, 46);
     }
-    // drawTouchControls removed
+
     function drawGameOver() {
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#fff";
       ctx.textAlign = "center";
       
+      // Responsive font sizes for mobile
+      const isMobileLayout = canvas.height < 600;
+      const titleFont = isMobileLayout ? "28px" : "36px";
+      const scoreFont = isMobileLayout ? "24px" : "30px";
+      const standardFont = isMobileLayout ? "14px" : "16px";
+      const leaderboardTitleFont = isMobileLayout ? "18px" : "20px";
+      const tableFont = isMobileLayout ? "12px" : "13px";
+      
+      // Start layout from top with proper spacing
+      let yPos = isMobileLayout ? 40 : 60;
+      
       // Game Over title
-      ctx.font = `36px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Game Over", canvas.width/2, canvas.height/2 - 120);
+      ctx.font = `${titleFont} ${FONT_STACK_BOLD}`;
+      ctx.fillText("Game Over", canvas.width/2, yPos);
+      yPos += isMobileLayout ? 35 : 50;
       
       // Current score
-      ctx.font = `30px ${FONT_STACK_BOLD}`;
-      ctx.fillText(String(Math.floor(score)), canvas.width/2, canvas.height/2 - 80);
+      ctx.font = `${scoreFont} ${FONT_STACK_BOLD}`;
+      ctx.fillText(String(Math.floor(score)), canvas.width/2, yPos);
+      yPos += isMobileLayout ? 30 : 40;
       
       // Best score
-      ctx.font = `16px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, canvas.height/2 - 55);
+      ctx.font = `${standardFont} ${FONT_STACK_BOLD}`;
+      ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, yPos);
+      yPos += isMobileLayout ? 25 : 35;
       
-      // Leaderboard section
-      if (leaderboardEnabled && gameOverLeaderboardData) {
-        let yPos = canvas.height/2 - 30;
-        
-        // Leaderboard title
-        ctx.font = `20px ${FONT_STACK_BOLD}`;
-        ctx.fillText("Top Scores", canvas.width/2, yPos);
-        yPos += 25;
-        
-        // Show top scores
-        ctx.font = `14px ${FONT_STACK_BOLD}`;
-        gameOverLeaderboardData.slice(0, 3).forEach((entry, index) => {
-          const rank = index + 1;
-          let medal;
-          if (rank === 1) medal = '🥇';
-          else if (rank === 2) medal = '🥈';
-          else medal = '🥉';
-          const text = `${medal} ${entry.player_name}: ${entry.score}`;
-          ctx.fillText(text, canvas.width/2, yPos);
-          yPos += 20;
-        });
-        
-        yPos += 10;
-        
-        // Score submission section
-        if (!gameOverScoreSubmitted) {
-          // Name input prompt/field
-          ctx.font = `16px ${FONT_STACK_BOLD}`;
-          if (!gameOverNameInputActive) {
-            ctx.fillText("Enter your name:", canvas.width/2, yPos);
-          } else {
-            const displayName = gameOverPlayerName + '|';
-            ctx.fillText(`Name: ${displayName}`, canvas.width/2, yPos);
-          }
-          yPos += 25;
-          
-          // Submit button
-          const submitBtnW = 140, submitBtnH = 32;
-          const submitBtnX = canvas.width/2 - submitBtnW/2;
-          const submitBtnY = yPos - 8;
-          ctx.fillStyle = gameOverNameInputActive && gameOverPlayerName.trim() ? "#228B22" : "#666";
-          ctx.fillRect(submitBtnX, submitBtnY, submitBtnW, submitBtnH);
-          ctx.fillStyle = "#fff";
-          ctx.font = `16px ${FONT_STACK_BOLD}`;
-          const submitText = gameOverNameInputActive ? "Submit Score" : "Click to Enter Name";
-          ctx.fillText(submitText, canvas.width/2, submitBtnY + submitBtnH/2 + 5);
-          yPos += 45;
-        } else {
-          ctx.font = `16px ${FONT_STACK_BOLD}`;
-          ctx.fillStyle = "#90EE90";
-          ctx.fillText("Score submitted!", canvas.width/2, yPos);
-          ctx.fillStyle = "#fff";
-          yPos += 30;
+      // Leaderboard section - always reserve space for maximum content
+      if (leaderboardEnabled) {
+        if (gameOverLeaderboardData) {
+          // Leaderboard title
+          ctx.font = `${leaderboardTitleFont} ${FONT_STACK_BOLD}`;
+          ctx.fillText("Leaderboard", canvas.width/2, yPos);
         }
-      } else if (leaderboardEnabled) {
-        // Loading state
-        ctx.font = `16px ${FONT_STACK_BOLD}`;
-        ctx.fillText("Loading leaderboard...", canvas.width/2, canvas.height/2 - 10);
+        yPos += isMobileLayout ? 25 : 35; // Always advance regardless of data
+        
+        if (gameOverLeaderboardData) {
+          // Table formatting settings
+          const tableWidth = isMobileLayout ? 280 : 320;
+          const rankColWidth = 35;
+          const nameColWidth = isMobileLayout ? 160 : 200;
+          const scoreColWidth = isMobileLayout ? 85 : 85;
+          const leftMargin = (canvas.width - tableWidth) / 2;
+          const rankX = leftMargin;
+          const nameX = leftMargin + rankColWidth;
+          const scoreX = leftMargin + rankColWidth + nameColWidth;
+          const rowHeight = isMobileLayout ? 18 : 20;
+          
+          // Display top scores
+          ctx.font = `${tableFont} ${FONT_STACK_BOLD}`;
+          const displayCount = Math.min(10, gameOverLeaderboardData.length);
+          
+          for (let i = 0; i < displayCount; i++) {
+            const entry = gameOverLeaderboardData[i];
+            const rank = i + 1;
+            
+            // Highlight user's entry if it's in top 10
+            const isUserEntry = gameOverUserScoreEntry && 
+                               entry.player_name === gameOverUserScoreEntry.player_name && 
+                               entry.score === gameOverUserScoreEntry.score;
+            
+            if (isUserEntry) {
+              ctx.fillStyle = "#FFD700"; // Gold highlight for user
+            } else {
+              ctx.fillStyle = "#fff"; // Normal white text
+            }
+            
+            // Set text alignment for each column
+            ctx.textAlign = "right";
+            ctx.fillText(`${rank}.`, rankX + rankColWidth - 10, yPos);
+            
+            ctx.textAlign = "left";
+            ctx.fillText(entry.player_name, nameX, yPos);
+            
+            ctx.textAlign = "right";
+            ctx.fillText(entry.score.toString(), scoreX + scoreColWidth, yPos);
+            
+            yPos += rowHeight;
+          }
+          
+          ctx.fillStyle = "#fff"; // Reset color
+        }
+        
+        // Always reserve space for 10 entries
+        const rowHeight = isMobileLayout ? 18 : 20;
+        const maxEntries = 10;
+        const actualEntries = gameOverLeaderboardData ? Math.min(10, gameOverLeaderboardData.length) : 0;
+        const remainingRows = maxEntries - actualEntries;
+        yPos += remainingRows * rowHeight;
+        
+        // Always reserve space for user entry section (ellipsis + user row)
+        if (gameOverLeaderboardData && gameOverUserScoreEntry && gameOverUserRank && gameOverUserRank > 10) {
+          yPos += 10; // Gap before ellipsis
+          
+          // Show ellipsis
+          ctx.textAlign = "center";
+          ctx.fillText("...", canvas.width/2, yPos);
+          yPos += rowHeight;
+          
+          // Show user's entry highlighted
+          const tableWidth = isMobileLayout ? 280 : 320;
+          const rankColWidth = 35;
+          const nameColWidth = isMobileLayout ? 160 : 200;
+          const scoreColWidth = isMobileLayout ? 85 : 85;
+          const leftMargin = (canvas.width - tableWidth) / 2;
+          const rankX = leftMargin;
+          const nameX = leftMargin + rankColWidth;
+          const scoreX = leftMargin + rankColWidth + nameColWidth;
+          
+          ctx.fillStyle = "#FFD700"; // Gold highlight
+          
+          ctx.textAlign = "right";
+          ctx.fillText(`${gameOverUserRank}.`, rankX + rankColWidth - 10, yPos);
+          
+          ctx.textAlign = "left";
+          ctx.fillText(gameOverUserScoreEntry.player_name, nameX, yPos);
+          
+          ctx.textAlign = "right";
+          ctx.fillText(gameOverUserScoreEntry.score.toString(), scoreX + scoreColWidth, yPos);
+          
+          ctx.fillStyle = "#fff"; // Reset color
+          yPos += rowHeight;
+        } else {
+          // Reserve space even if user is not shown below top 10
+          yPos += 10 + rowHeight + rowHeight; // Gap + ellipsis + user entry space
+        }
+        
+        ctx.textAlign = "center"; // Reset text alignment
+        yPos += 15; // Standard spacing after leaderboard section
+        
+      } else {
+        // If leaderboard is disabled, still reserve the same amount of space
+        const rowHeight = isMobileLayout ? 18 : 20;
+        yPos += (isMobileLayout ? 25 : 35); // Title space
+        yPos += 10 * rowHeight; // 10 rows space
+        yPos += 10 + rowHeight + rowHeight; // User entry space
+        yPos += 15; // Standard spacing
       }
       
-      // Restart button (moved down)
+      // Add some padding before restart button
+      yPos += isMobileLayout ? 15 : 20;
+      
+      // Restart button - positioned dynamically based on content above
       const btnW = 110, btnH = 44;
       const btnX = canvas.width/2 - btnW/2;
-      const btnY = canvas.height/2 + 150;
+      const btnY = getRestartButtonPosition();
+      
       ctx.fillStyle = "#222";
       ctx.fillRect(btnX, btnY, btnW, btnH);
       ctx.fillStyle = "#fff";
@@ -1287,14 +1464,30 @@
       // Controls hint
       ctx.font = `12px ${FONT_STACK_BOLD}`;
       if (!isMobile) {
-        if (leaderboardEnabled && !gameOverScoreSubmitted && !gameOverNameInputActive) {
-          ctx.fillText("SPACE: Enter Name  •  ENTER: Submit  •  ESC: Cancel", canvas.width/2, btnY + btnH + 20);
-        } else {
-          ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY + btnH + 20);
-        }
+        ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY + btnH + 20);
       }
 
       ctx.textAlign = "left";
+    }
+
+    function getRestartButtonPosition() {
+      // Calculate fixed position based on maximum possible leaderboard size
+      const isMobileLayout = canvas.height < 600;
+      let yPos = isMobileLayout ? 40 : 60; // Initial yPos
+      yPos += isMobileLayout ? 35 : 50; // Title spacing
+      yPos += isMobileLayout ? 30 : 40; // Score spacing  
+      yPos += isMobileLayout ? 25 : 35; // Best score spacing
+      
+      // Always reserve space for maximum leaderboard content
+      yPos += isMobileLayout ? 25 : 35; // Leaderboard title spacing
+      
+      const rowHeight = isMobileLayout ? 18 : 20;
+      yPos += 10 * rowHeight; // Always reserve space for 10 entries
+      yPos += 10 + rowHeight + rowHeight; // Always reserve space for user entry section
+      yPos += 15; // Standard spacing after leaderboard
+      
+      yPos += isMobileLayout ? 15 : 20; // Padding before button
+      return Math.max(yPos, canvas.height - (isMobileLayout ? 80 : 120));
     }
 
     function draw() {
@@ -1341,6 +1534,7 @@
       }
 
       if (!gameRunning) drawGameOver();
+      if (namePromptActive) drawNamePrompt();
     }
 
     // -------- loop --------
@@ -1358,6 +1552,12 @@
       sizeCanvasToViewport();
       initMusic();
       setupInputUI();
+      
+      // Check for existing player name, prompt if needed
+      if (!loadPlayerName()) {
+        promptForName();
+      }
+      
       // Unlock WebAudio on first user interaction so SFX can play even if BGM stays off
       const unlockers = ['pointerdown', 'touchstart', 'keydown'];
       unlockers.forEach(ev => {
