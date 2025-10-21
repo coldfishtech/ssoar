@@ -159,6 +159,66 @@
       /* Canvas width will be set via JS; fallback respects body padding */
       canvas { width: 100%; height: auto; }
     }
+
+    /* Name overlay for mobile text input */
+    #name-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none; /* shown via JS */
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      padding: 24px;
+    }
+    #name-modal {
+      width: 420px;
+      max-width: 100%;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      padding: 20px 16px;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    #name-modal h2 {
+      margin: 0 0 8px;
+      font-family: Arial Black, Arial, Helvetica, sans-serif;
+      font-size: 22px;
+      color: #111;
+    }
+    #name-modal p {
+      margin: 0 0 12px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+      color: #222;
+    }
+    #name-input {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: Arial Black, Arial, Helvetica, sans-serif;
+      font-size: 18px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid #b0b7c2;
+      margin: 6px 0 12px;
+    }
+    #name-continue {
+      width: 100%;
+      font-family: Arial Black, Arial, Helvetica, sans-serif;
+      font-size: 16px;
+      background: #4CAF50;
+      color: #fff;
+      border: 1px solid #45a049;
+      border-radius: 8px;
+      padding: 12px 14px;
+      cursor: pointer;
+    }
+    #name-continue:disabled {
+      background: #888;
+      border-color: #666;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -182,6 +242,16 @@
     </div>
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
+  
+  <!-- Name entry overlay (used on mobile so soft keyboard appears) -->
+  <div id="name-overlay" role="dialog" aria-modal="true" aria-labelledby="name-title">
+    <div id="name-modal">
+      <h2 id="name-title">Welcome to SSOAR!</h2>
+      <p>Enter your name for the leaderboard:</p>
+      <input id="name-input" type="text" inputmode="latin" autocomplete="name" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" placeholder="Your name" />
+      <button id="name-continue" type="button" disabled>Continue</button>
+    </div>
+  </div>
   
   <!-- Desktop instructions (hidden on mobile) -->
   <div id="desktop-instructions" aria-hidden="true" style="display:none;"></div>
@@ -296,6 +366,10 @@
   const topbarEl = document.getElementById('topbar');
     const controlsEl = document.getElementById('controls');
   const desktopInstrEl = document.getElementById('desktop-instructions');
+  // Name overlay elements
+  const nameOverlayEl = document.getElementById('name-overlay');
+  const nameInputEl = document.getElementById('name-input');
+  const nameContinueEl = document.getElementById('name-continue');
 
     // Responsive sizing: fill available viewport between title and controls
   function sizeCanvasToViewport() {
@@ -490,6 +564,28 @@
         desktopInstrEl.textContent = INSTR_TEXT;
         // On desktop, keyboard is the primary input.
       }
+
+        // --- Name overlay controls ---
+        function showNameOverlay() {
+          if (!nameOverlayEl) return;
+          nameOverlayEl.style.display = 'flex';
+          // small delay to ensure paint before focus on some mobile browsers
+          setTimeout(() => {
+            if (nameInputEl) {
+              nameInputEl.value = playerName || '';
+              nameInputEl.focus();
+            }
+            updateNameContinueState();
+          }, 0);
+        }
+        function hideNameOverlay() {
+          if (!nameOverlayEl) return;
+          nameOverlayEl.style.display = 'none';
+        }
+        function updateNameContinueState() {
+          const valid = (nameInputEl?.value || '').trim().length > 0;
+          if (nameContinueEl) nameContinueEl.disabled = !valid;
+        }
     }
 
     // -------- core tunables --------
@@ -675,7 +771,7 @@
     window.addEventListener("keydown", e => {
       // Handle name prompt during initial setup
       if (namePromptActive) {
-        if (e.code === "Enter" && playerName.trim()) {
+        if (!isMobile && e.code === "Enter" && playerName.trim()) {
           submitPlayerName();
           e.preventDefault();
           return;
@@ -780,6 +876,29 @@
   const btnRight = document.getElementById('btn-right');
   const btnJump = document.getElementById('btn-jump');
   let desktopButtonsBound = false;
+
+    // Name overlay events
+    if (nameInputEl) {
+      nameInputEl.addEventListener('input', () => {
+        playerName = nameInputEl.value;
+        updateNameContinueState();
+      });
+      nameInputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (nameInputEl.value || '').trim()) {
+          playerName = nameInputEl.value.trim();
+          submitPlayerName();
+          e.preventDefault();
+        }
+      });
+    }
+    if (nameContinueEl) {
+      nameContinueEl.addEventListener('click', () => {
+        if ((nameInputEl.value || '').trim()) {
+          playerName = nameInputEl.value.trim();
+          submitPlayerName();
+        }
+      });
+    }
 
     function bindControl(el, onPress) {
       if (!el) return;
@@ -909,6 +1028,10 @@
       
       namePromptActive = true;
       playerName = '';
+      // On mobile, show an HTML overlay so the soft keyboard appears
+      if (isMobile) {
+        showNameOverlay();
+      }
     }
 
     // -------- Leaderboard Functions --------
@@ -1003,6 +1126,7 @@
       if (playerName.trim().length > 0) {
         savePlayerName(playerName.trim());
         namePromptActive = false;
+        hideNameOverlay();
       }
     }
 
@@ -1533,8 +1657,8 @@
         ctx.textAlign = "left";
       }
 
-      if (!gameRunning) drawGameOver();
-      if (namePromptActive) drawNamePrompt();
+  if (!gameRunning) drawGameOver();
+  if (namePromptActive && !isMobile) drawNamePrompt();
     }
 
     // -------- loop --------
@@ -1556,6 +1680,7 @@
       // Check for existing player name, prompt if needed
       if (!loadPlayerName()) {
         promptForName();
+        if (isMobile) showNameOverlay();
       }
       
       // Unlock WebAudio on first user interaction so SFX can play even if BGM stays off
