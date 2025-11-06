@@ -256,7 +256,10 @@
     .menu-toggle { background: transparent; color: #000; }
     .menu-toggle[aria-pressed="true"] { background: transparent; color: #000; }
   .menu-actions { display: flex; justify-content: center; margin-top: 18px; }
-  .menu-instruction { font-size: 12px; color: #000; opacity: 0.85; margin-top: 6px; text-align: center; }
+  .menu-instruction { font-size: 12px; color: #000; opacity: 0.5; margin-top: 0; padding: 0; text-align: center; }
+  /* Ensure no sibling gap above the instruction line under buttons */
+  #startMenu > .menu-instruction { margin-top: 0 !important; }
+  #gameOver > .menu-instruction { margin-top: 0 !important; }
   .desktop-only { display: block; }
   /* Push the action row toward the bottom to mirror mock layout */
   #startMenu .menu-actions { margin-top: auto; }
