@@ -256,7 +256,7 @@
       <button id="btn-sfx-mute" class="mute-btn" aria-label="Mute SFX" title="Mute SFX" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
-          <path class="waves" d="M14 9c1.5 1.5 1.5 4.5 0 6" stroke="#000" stroke-width="2" fill="none"/>
+          <path class="waves" d="M14 9c1.5 1.5 1.5 4.5 0 6m2.5-8.5c3 3 3 8 0 11" stroke="#000" stroke-width="2" fill="none"/>
           <path class="mute-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
         </svg>
       </button>
@@ -294,7 +294,7 @@
       <button id="sm-btn-sfx-mute" class="mute-btn" aria-label="Mute SFX" title="Mute SFX" aria-pressed="false" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
-          <path class="waves" d="M14 9c1.5 1.5 1.5 4.5 0 6" stroke="#000" stroke-width="2" fill="none"/>
+          <path class="waves" d="M14 9c1.5 1.5 1.5 4.5 0 6m2.5-8.5c3 3 3 8 0 11" stroke="#000" stroke-width="2" fill="none"/>
           <path class="mute-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
         </svg>
       </button>
@@ -428,10 +428,10 @@
     let scWidget = null;
   const scIframe = document.getElementById('sc-widget');
   const musicTitleEl = document.getElementById('music-title');
-  const btnMusicMute = document.getElementById('btn-music-mute');
-  const btnSfxMute = document.getElementById('btn-sfx-mute');
-  const smBtnMusicMute = document.getElementById('sm-btn-music-mute');
-  const smBtnSfxMute = document.getElementById('sm-btn-sfx-mute');
+  let btnMusicMute = document.getElementById('btn-music-mute');
+  let btnSfxMute = document.getElementById('btn-sfx-mute');
+  let smBtnMusicMute = document.getElementById('sm-btn-music-mute');
+  let smBtnSfxMute = document.getElementById('sm-btn-sfx-mute');
   let musicMuted = false;
   let lastMusicVolume = 100; // percent
     let scReady = false;
@@ -498,6 +498,8 @@
     }
     function initMusic() {
       if (!window.SC || !scIframe) return;
+      // Ensure we have fresh references before wiring events
+      refreshAudioButtonRefs();
       scWidget = SC.Widget(scIframe);
       scWidget.bind(SC.Widget.Events.READY, () => {
         scReady = true;
@@ -528,6 +530,13 @@
       wire(smBtnMusicMute, () => setMusicMuted(!musicMuted));
       wire(btnSfxMute, () => { setSfxEnabled(!sfxEnabled); if (sfxEnabled) beep(520, 70, 'square', 0.03); });
       wire(smBtnSfxMute, () => { setSfxEnabled(!sfxEnabled); if (sfxEnabled) beep(520, 70, 'square', 0.03); });
+    }
+
+    function refreshAudioButtonRefs() {
+      btnMusicMute = document.getElementById('btn-music-mute');
+      btnSfxMute = document.getElementById('btn-sfx-mute');
+      smBtnMusicMute = document.getElementById('sm-btn-music-mute');
+      smBtnSfxMute = document.getElementById('sm-btn-sfx-mute');
     }
     // Setup desktop vs mobile UI elements (controls vs instructions)
     function setupInputUI() {
@@ -1419,6 +1428,7 @@
       // Show menu and wait for Play to start the game loop state
       showStartMenu();
       // Initialize topbar mute buttons UI
+      refreshAudioButtonRefs();
       updateSfxMuteUI?.();
       updateMusicMuteUI?.();
       requestAnimationFrame(frame);
