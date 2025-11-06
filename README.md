@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ssoar_title.png" alt="SSOAR" width="420" />
+  <img src="soar_title.png" alt="SSOAR" width="420" />
 </p>
 
 # SSOAR: Touch the Sky
