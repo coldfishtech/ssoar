@@ -736,6 +736,10 @@
   const CLOUD_OVERLAP_DRAW = 1; // draw player 1px into cloud for micro-overlap
   let clouds = [];
   let standingOnCloud = false; // frame flag for rendering micro-overlap
+  
+    // -------- background tower --------
+    const TOWER_SRC = 'resources/tower/tower.png';
+    let towerImg = null;
 
     // -------- difficulty (static) --------
   let MAX_CLOUD_SPACING = 150;
@@ -1271,70 +1275,11 @@
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    // Concrete ground style with cracks texture
-    let concretePattern = null;
-    function getConcretePattern() {
-      if (concretePattern) return concretePattern;
-      const off = document.createElement('canvas');
-      off.width = 64; off.height = 64;
-      const c = off.getContext('2d');
-      // base concrete color
-      c.fillStyle = '#4a4f57';
-      c.fillRect(0, 0, off.width, off.height);
-      // subtle noise speckles
-      const imgData = c.getImageData(0,0,off.width,off.height);
-      for (let i = 0; i < imgData.data.length; i += 4) {
-        const n = (Math.random()*30)|0; // 0..29
-        imgData.data[i]   = Math.max(0, imgData.data[i]   - n);
-        imgData.data[i+1] = Math.max(0, imgData.data[i+1] - n);
-        imgData.data[i+2] = Math.max(0, imgData.data[i+2] - n);
-      }
-      c.putImageData(imgData, 0, 0);
-      // cracks: draw randomized branched lines
-      c.strokeStyle = 'rgba(20,22,25,0.6)';
-      c.lineWidth = 1;
-      c.lineCap = 'round';
-      function crack(x, y, len, angle, depth=0) {
-        c.beginPath();
-        c.moveTo(x, y);
-        const step = 4 + Math.random()*3;
-        let cx = x, cy = y, a = angle;
-        for (let t = 0; t < len; t += step) {
-          a += (Math.random()-0.5) * 0.3; // slight jitter
-          cx += Math.cos(a) * step;
-          cy += Math.sin(a) * step;
-          c.lineTo(cx, cy);
-          // occasional branch
-          if (depth < 2 && Math.random() < 0.1) {
-            crack(cx, cy, len * 0.25, a + (Math.random()<0.5?-1:1)*(0.6+Math.random()*0.6), depth+1);
-          }
-        }
-        c.stroke();
-      }
-      for (let i = 0; i < 6; i++) {
-        const sx = Math.random()*off.width;
-        const sy = Math.random()*off.height;
-        const ang = Math.random()*Math.PI*2;
-        crack(sx, sy, 36 + Math.random()*28, ang);
-      }
-      concretePattern = ctx.createPattern(off, 'repeat');
-      return concretePattern;
-    }
-
+    // Ground: solid black without concrete texture
     function drawGround() {
       if (!groundActive) return;
-      // fill with dark concrete base
-      ctx.fillStyle = '#3f444b';
+      ctx.fillStyle = '#000000';
       ctx.fillRect(0, ground.y, viewWidth(), ground.height);
-      // overlay cracks pattern
-      ctx.save();
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = getConcretePattern();
-      ctx.fillRect(0, ground.y, viewWidth(), ground.height);
-      ctx.restore();
-      // subtle top highlight to separate from air
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.fillRect(0, ground.y, viewWidth(), 3);
     }
     function drawPlayer() {
       const yOff = standingOnCloud ? CLOUD_OVERLAP_DRAW : 0;
@@ -1419,6 +1364,13 @@
       ctx.translate(-camX, -camY);
 
   // World rendering (background already drawn in pixel space)
+      // Background tower (drawn behind clouds and player)
+      if (towerImg) {
+        // Place tower centered horizontally; bottom sits on ground top edge
+        const tx = Math.round((viewWidth() - towerImg.width) / 2);
+        const ty = Math.round(ground.y + ground.height - towerImg.height);
+        ctx.drawImage(towerImg, tx, ty);
+      }
       for (let cloud of clouds) drawCloud(cloud);
       drawGround();
       drawPlayer();
@@ -1461,6 +1413,8 @@
       setupInputUI();
       // Begin loading player sprites (non-blocking)
       playerAnim.load().catch(() => { /* keep fallback rectangles */ });
+  // Load background tower image
+  loadImage(TOWER_SRC).then(img => { towerImg = img; }).catch(()=>{});
       
       // Unlock WebAudio on first user interaction so SFX can play even if BGM stays off
       const unlockers = ['pointerdown', 'touchstart', 'keydown'];
