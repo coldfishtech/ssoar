@@ -1072,6 +1072,89 @@
       arrowGroup.addEventListener('lostpointercapture', endSlide);
     }
 
+    // Enhanced mobile usability: allow left/right control by touching anywhere
+    // in the controls area to the left of the Jump button, with sliding/hysteresis.
+    (function bindWideArrowZone() {
+      const HYSTERESIS = 12; // px movement before switching direction
+      let wideActive = false;
+      let widePointerId = null;
+      let wideMidX = null; // decision midpoint (based on arrowGroup center)
+      let wideLastDir = null; // 'left' | 'right' | null
+
+      if (!controlsEl) return;
+
+      function setDir(dir) {
+        if (dir === wideLastDir) return;
+        // release previous
+        keys["ArrowLeft"] = false;
+        keys["ArrowRight"] = false;
+        if (dir === 'left') keys["ArrowLeft"] = true;
+        else if (dir === 'right') keys["ArrowRight"] = true;
+        wideLastDir = dir;
+      }
+
+      function computeMidX() {
+        // Use the visual arrow group center as a reference if available
+        const rect = arrowGroup?.getBoundingClientRect();
+        if (rect) return rect.left + rect.width / 2;
+        // fallback: center of controls
+        const c = controlsEl.getBoundingClientRect();
+        return c.left + c.width / 3; // bias left since jump sits on the right
+      }
+
+      function isOverJump(clientX, clientY) {
+        const j = btnJump?.getBoundingClientRect();
+        if (!j) return false;
+        // treat a slightly expanded jump button hit area to avoid accidental left/right
+        const PAD = 12;
+        return (
+          clientX >= (j.left - PAD) && clientX <= (j.right + PAD) &&
+          clientY >= (j.top - PAD) && clientY <= (j.bottom + PAD)
+        );
+      }
+
+      controlsEl.addEventListener('pointerdown', (e) => {
+        if (!isMobile) return; // desktop uses keyboard
+        // If directly over jump button, let the jump handler manage it
+        if (isOverJump(e.clientX, e.clientY)) return;
+        controlsEl.setPointerCapture?.(e.pointerId);
+        wideActive = true;
+        widePointerId = e.pointerId;
+        wideMidX = computeMidX();
+        // initial direction with small hysteresis band
+        const dx = e.clientX - wideMidX;
+        setDir(dx < -HYSTERESIS ? 'left' : (dx > HYSTERESIS ? 'right' : (wideLastDir || 'left')));
+        e.preventDefault();
+      });
+
+      function onWideMove(e) {
+        if (!wideActive || e.pointerId !== widePointerId) return;
+        const dx = e.clientX - wideMidX;
+        // switch only when surpassing hysteresis band
+        if (dx < -HYSTERESIS) setDir('left');
+        else if (dx > HYSTERESIS) setDir('right');
+        e.preventDefault();
+      }
+
+      function endWide(e) {
+        if (!wideActive || (e && e.pointerId !== widePointerId)) return;
+        wideActive = false;
+        widePointerId = null;
+        wideMidX = null;
+        wideLastDir = null;
+        keys["ArrowLeft"] = false;
+        keys["ArrowRight"] = false;
+      }
+
+      controlsEl.addEventListener('pointermove', onWideMove);
+      window.addEventListener('pointermove', onWideMove);
+      controlsEl.addEventListener('pointerup', endWide);
+      window.addEventListener('pointerup', endWide);
+      controlsEl.addEventListener('pointercancel', endWide);
+      window.addEventListener('pointercancel', endWide);
+      controlsEl.addEventListener('lostpointercapture', endWide);
+    })();
+
     // (removed) player name management
 
   // (removed) leaderboard functions
