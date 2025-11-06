@@ -1490,13 +1490,15 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       drawHUD();
       if (milestonePopup) {
+        ctx.save();
         ctx.fillStyle = `rgba(0, 0, 0, ${milestonePopup.alpha})`;
         ctx.textAlign = "center";
+        ctx.textBaseline = "top"; // ensure y coordinate is the top of the text box
         const numberSize = 132;
         ctx.font = `${numberSize}px ${FONT_STACK_BOLD}`;
         const sub = String(milestonePopup.scoreNumber);
         ctx.fillText(sub, canvas.width/2, milestonePopup.y);
-        ctx.textAlign = "left";
+        ctx.restore();
       }
 
   // (removed) canvas-drawn Game Over; DOM overlay handles it now
