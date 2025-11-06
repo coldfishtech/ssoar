@@ -1217,14 +1217,35 @@
       ctx.fillRect(player.x+8, player.y+8 + yOff, 16, 16);
     }
     function drawHUD() {
+      // Helper for letter-spacing on canvas text
+      function drawTextWithLetterSpacing(context, text, x, y, spacingPx) {
+        let cx = Math.round(x);
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          context.fillText(ch, cx, y);
+          cx += Math.round(context.measureText(ch).width + spacingPx);
+        }
+      }
+      const margin = 18; // 18px margin from edges
+      // Score: Arial bold 24pt with letter spacing -100 (≈ -0.1em)
+      const fontPt = 24;
+      const ptToPx = 96/72; // CSS points to px
+      const fontPx = Math.round(fontPt * ptToPx); // ~32px
+      const spacingPx = -0.1 * fontPx; // -100 tracking ≈ -0.1em
+
       ctx.fillStyle = "#000";
-      // Draw just the score number (32px)
-      ctx.font = `32px ${FONT_STACK_BOLD}`;
       ctx.textAlign = 'left';
-      ctx.fillText(String(Math.floor(score)), 10, 30);
+      const prevBaseline = ctx.textBaseline;
+      ctx.textBaseline = 'top';
+      ctx.font = `bold ${fontPt}pt Arial, Helvetica, sans-serif`;
+      const scoreText = String(Math.floor(score));
+      drawTextWithLetterSpacing(ctx, scoreText, margin, margin, spacingPx);
+
       // show pause indicator below score
+      const pauseY = margin + fontPx + 2;
       ctx.font = `12px ${FONT_STACK_BOLD}`;
-      if (paused) ctx.fillText("[Paused]", 10, 46);
+      if (paused) ctx.fillText("[Paused]", margin, pauseY);
+      ctx.textBaseline = prevBaseline;
     }
 
     function drawGameOver() {
