@@ -936,7 +936,7 @@
             player.dy = jumpPower;
             player.canJump = false;
             beep(660, 90, "square", 0.04); // jump SFX at liftoff
-            spawnPuff(player.x + player.width/2, player.y + player.height, 6);
+            spawnPuff(player.x + player.width/2, player.y + player.height, 6, '#ffffff');
           }
         }
       } else if (wantsJump && canJumpNow) {
