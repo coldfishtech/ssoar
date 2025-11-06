@@ -1441,7 +1441,7 @@
   // Progress: 0 -> 1 as score goes 0 -> 10000
   const p = Math.max(0, Math.min(1, (score || 0) / 10000));
         // Draw a finite stack of tiles so the tower can fully disappear into the bottom at p=1
-        const overlap = 3; // pixels of overlap to avoid visible seams between tiles
+  const overlap = 1; // pixels of overlap to avoid visible seams between tiles
         const step = Math.max(1, th - overlap);
         const nTiles = Math.ceil((canvas.height + th) / step) + 1;
         const offsetDown = p * (nTiles * th);
