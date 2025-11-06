@@ -539,20 +539,17 @@
       setTimeout(() => beep(240, 140, "square", 0.03), 240);
     }
 
-    // -------- background stripes --------
-    let bgOffset = 0;
+    // -------- background gradient --------
+    let bgOffset = 0; // retained for compatibility; no longer used for gradient
     function drawScrollingSky() {
-      const stripeHeight = 32;
-      // Subtle cool near-white palette (very light blue/grey)
-      const colors = ["#f4f8fc", "#f1f6fb", "#eef4f9", "#f1f6fb"];
       const h = viewHeight();
       const w = viewWidth();
-      const total = Math.ceil(h / stripeHeight) + 2;
-      for (let i = 0; i < total; i++) {
-        const y = (i * stripeHeight + (bgOffset % (stripeHeight * colors.length) + stripeHeight * colors.length)) % (stripeHeight * colors.length);
-        ctx.fillStyle = colors[i % colors.length];
-        ctx.fillRect(0, y, w, stripeHeight);
-      }
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      // Top (0) -> white, Bottom (1) -> #5b86aa
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#5b86aa');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
     }
 
     function createCloud(y) {
