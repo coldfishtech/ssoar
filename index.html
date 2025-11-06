@@ -133,14 +133,18 @@
       align-items: center;  /* vertically center differing image heights */
       touch-action: none;   /* allow sliding without triggering page scroll/zoom */
     }
-    /* jump (spacebar): keep circular but no symbol */
+    /* jump: replace with image; keep centers aligned */
     .ctrl-btn--jump {
-      width: 68px; height: 68px;
-      border-radius: 50%;
+      width: auto; height: auto;
+      background: transparent; border: none;
       font-size: 0; line-height: 0;
       -webkit-appearance: none; appearance: none;
-      clip-path: none; /* ensure no polygon shape leaks onto jump */
+      border-radius: 0;
+      clip-path: none;
+      padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
     }
+    .ctrl-btn--jump img { display: block; image-rendering: pixelated; pointer-events: none; }
     .ctrl-btn:active { filter: brightness(1.15); }
 
     /* Mobile-friendly layout: let elements span full width and canvas fill viewport remainder */
@@ -197,14 +201,13 @@
   <div id="desktop-instructions" aria-hidden="true" style="display:none;"></div>
   <div id="controls" aria-label="Game Controls">
     <div id="arrow-group" class="ctrl-group-arrows" aria-label="Directional Controls">
-      <button id="btn-left" class="ctrl-btn ctrl-arrow ctrl-arrow--left" aria-label="Left" title="Left" tabindex="-1">
-        <img src="resources/buttons/L_button.png" alt="Left">
-      </button>
-      <button id="btn-right" class="ctrl-btn ctrl-arrow ctrl-arrow--right" aria-label="Right" title="Right" tabindex="-1">
-        <img src="resources/buttons/R_button.png" alt="Right">
+      <button id="btn-left" class="ctrl-btn ctrl-arrow ctrl-arrow--left" aria-label="Move" title="Move" tabindex="-1">
+        <img src="resources/buttons/L_button.png" alt="Move">
       </button>
     </div>
-    <button id="btn-jump" class="ctrl-btn ctrl-btn--jump" aria-label="Jump" title="Jump" tabindex="-1"></button>
+    <button id="btn-jump" class="ctrl-btn ctrl-btn--jump" aria-label="Jump" title="Jump" tabindex="-1">
+      <img src="resources/buttons/R_button.png" alt="Jump">
+    </button>
   </div>
   <script>
     // (removed) leaderboard and Supabase configuration/functions
@@ -819,7 +822,7 @@
 
     // Sliding interaction for arrows: allows dragging finger between Left/Right seamlessly
     const arrowGroup = document.getElementById('arrow-group');
-    if (arrowGroup && btnLeft && btnRight) {
+    if (arrowGroup) {
       let activeDir = null; // 'left' | 'right' | null
       let captured = false;
       let midX = null; // horizontal threshold for left/right
@@ -868,8 +871,8 @@
         endSlide();
         e.preventDefault();
       };
-      arrowGroup.addEventListener('pointermove', onMove);
-      window.addEventListener('pointermove', onMove);
+  arrowGroup.addEventListener('pointermove', onMove);
+  window.addEventListener('pointermove', onMove);
       function endSlide() {
         captured = false;
         midX = null;
