@@ -116,15 +116,22 @@
       -webkit-tap-highlight-color: transparent;
     }
     /* arrows: pentagonal via clip-path; remove text visuals */
-  .ctrl-arrow { width: 72px; height: 44px; border-radius: 0; font-size: 0; line-height: 0; }
-  /* sleeker arrows: body extends fully to inner edge so no seam between buttons */
-  .ctrl-arrow--right { clip-path: polygon(0% 0%, 82% 0%, 100% 50%, 82% 100%, 0% 100%); }
-  .ctrl-arrow--left  { clip-path: polygon(100% 0%, 18% 0%, 0% 50%, 18% 100%, 100% 100%); }
+  .ctrl-arrow {
+    /* Replace shape with image buttons */
+    width: auto; height: auto; border-radius: 0; font-size: 0; line-height: 0;
+    background: transparent; border: none; padding: 0;
+    clip-path: none;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .ctrl-arrow img { display: block; image-rendering: pixelated; pointer-events: none; }
+  /* legacy shape overrides */
+  .ctrl-arrow--right, .ctrl-arrow--left { clip-path: none; }
     /* arrow group: tighter spacing and better touch handling */
     .ctrl-group-arrows {
       display: flex;
       gap: 2px;            /* slight visual separation */
-      touch-action: none;  /* allow sliding without triggering page scroll/zoom */
+      align-items: center;  /* vertically center differing image heights */
+      touch-action: none;   /* allow sliding without triggering page scroll/zoom */
     }
     /* jump (spacebar): keep circular but no symbol */
     .ctrl-btn--jump {
@@ -190,8 +197,12 @@
   <div id="desktop-instructions" aria-hidden="true" style="display:none;"></div>
   <div id="controls" aria-label="Game Controls">
     <div id="arrow-group" class="ctrl-group-arrows" aria-label="Directional Controls">
-      <button id="btn-left" class="ctrl-btn ctrl-arrow ctrl-arrow--left" aria-label="Left" title="Left" tabindex="-1"></button>
-      <button id="btn-right" class="ctrl-btn ctrl-arrow ctrl-arrow--right" aria-label="Right" title="Right" tabindex="-1"></button>
+      <button id="btn-left" class="ctrl-btn ctrl-arrow ctrl-arrow--left" aria-label="Left" title="Left" tabindex="-1">
+        <img src="resources/buttons/L_button.png" alt="Left">
+      </button>
+      <button id="btn-right" class="ctrl-btn ctrl-arrow ctrl-arrow--right" aria-label="Right" title="Right" tabindex="-1">
+        <img src="resources/buttons/R_button.png" alt="Right">
+      </button>
     </div>
     <button id="btn-jump" class="ctrl-btn ctrl-btn--jump" aria-label="Jump" title="Jump" tabindex="-1"></button>
   </div>
@@ -438,7 +449,7 @@
     // Jump_L.png, Jump_R.png
     // Falling_L.png, Falling_R.png
     // Walking_L_1.png..Walking_L_4.png, Walking_R_1.png..Walking_R_4.png
-    const SPRITE_BASE = 'sprites/player/';
+  const SPRITE_BASE = 'resources/sprites/player/';
     function loadImage(src) {
       return new Promise((resolve, reject) => {
         const img = new Image();
