@@ -412,6 +412,16 @@
       canvas.style.width = targetW + 'px';
       canvas.style.height = targetH + 'px';
 
+      // Desktop: set title image width to ~1/3 of the game canvas width
+      if (titleImgEl) {
+        if (isSmall) {
+          // Let mobile CSS control the title size
+          titleImgEl.style.width = '';
+        } else {
+          titleImgEl.style.width = Math.round(targetW / 3) + 'px';
+        }
+      }
+
       // Use logical pixel dimensions for internal canvas to keep physics in sync
       const logicalW = Math.round(targetW);
       const logicalH = Math.round(targetH);
