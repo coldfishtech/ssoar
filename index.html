@@ -153,6 +153,12 @@
       #controls { gap: 80px; }
       /* Canvas width will be set via JS; fallback respects body padding */
       canvas { width: 100%; height: auto; }
+      /* Make mobile control buttons 20% bigger */
+      #controls .ctrl-arrow img,
+      #controls .ctrl-btn--jump img {
+        transform: scale(1.2);
+        transform-origin: center center;
+      }
     }
 
     /* (removed) name overlay styles */
