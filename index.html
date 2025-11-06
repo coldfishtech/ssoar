@@ -1080,6 +1080,9 @@
       let widePointerId = null;
       let wideMidX = null; // decision midpoint (based on arrowGroup center)
       let wideLastDir = null; // 'left' | 'right' | null
+      // Expanded jump hit area support (ghost jump when near the button)
+      let jumpGhostActive = false;
+      let jumpPointerId = null;
 
       if (!controlsEl) return;
 
@@ -1105,8 +1108,8 @@
       function isOverJump(clientX, clientY) {
         const j = btnJump?.getBoundingClientRect();
         if (!j) return false;
-        // treat a slightly expanded jump button hit area to avoid accidental left/right
-        const PAD = 12;
+        // Expanded jump hit area to allow slight misses to still trigger jump
+        const PAD = 28;
         return (
           clientX >= (j.left - PAD) && clientX <= (j.right + PAD) &&
           clientY >= (j.top - PAD) && clientY <= (j.bottom + PAD)
@@ -1115,8 +1118,20 @@
 
       controlsEl.addEventListener('pointerdown', (e) => {
         if (!isMobile) return; // desktop uses keyboard
-        // If directly over jump button, let the jump handler manage it
-        if (isOverJump(e.clientX, e.clientY)) return;
+        // If within the expanded jump area
+        if (isOverJump(e.clientX, e.clientY)) {
+          // If the actual jump button is the target (or contains target), let its handler manage
+          if (btnJump && btnJump.contains(e.target)) return;
+          // Otherwise, treat this as a ghost jump press
+          controlsEl.setPointerCapture?.(e.pointerId);
+          jumpGhostActive = true;
+          jumpPointerId = e.pointerId;
+          // mirror btnJump press behavior
+          jumpBufferTimer = JUMP_BUFFER;
+          keys["Space"] = true;
+          e.preventDefault();
+          return;
+        }
         controlsEl.setPointerCapture?.(e.pointerId);
         wideActive = true;
         widePointerId = e.pointerId;
@@ -1137,6 +1152,13 @@
       }
 
       function endWide(e) {
+        // End ghost jump if that was the active pointer
+        if (jumpGhostActive && (!e || e.pointerId === jumpPointerId)) {
+          jumpGhostActive = false;
+          jumpPointerId = null;
+          keys["Space"] = false;
+          spaceHeld = false;
+        }
         if (!wideActive || (e && e.pointerId !== widePointerId)) return;
         wideActive = false;
         widePointerId = null;
