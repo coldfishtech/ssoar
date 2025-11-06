@@ -56,28 +56,11 @@
       font-family: Arial Black, Arial, Helvetica, sans-serif;
       font-weight: 900;
     }
-  /* SVG play/pause icon (black) */
-  #music-icon { width: 16px; height: 16px; cursor: pointer; display: inline-block; }
-    #music-icon.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
-    /* Ensure the label matches the icon/scope height visually */
-    #music-label {
-      font-family: Arial Black, Arial, Helvetica, sans-serif;
-      font-weight: 900;
-      font-size: 12px;
-      color: #222;
-      height: 28px;
-      display: inline-flex;
-      align-items: center;
-    }
-    /* Tiny frequency visualizer next to the music button */
-    #music-scope {
-      display: inline-block;
-      width: 60px;
-      height: 16px; /* match icon height */
-      background: transparent;
-      border: none !important; /* override global canvas border */
-      box-shadow: none;
-    }
+    /* Music/SFX topbar UI */
+    #music-title { font-size: 12px; font-weight: 900; color: #222; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mute-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #b0b7c2; border-radius: 4px; cursor: pointer; }
+    .mute-btn svg { width: 14px; height: 14px; display: block; }
+    .divider { width: 1px; height: 16px; background: #b0b7c2; display: inline-block; margin: 0 6px; }
     
     canvas {
       background: transparent; /* the canvas draws its own sky, page around is off-white */
@@ -248,11 +231,23 @@
   <div id="topbar">
   <img id="titleImage" src="soar_title.png" alt="SSOAR Title" />
     <div id="musicbar" aria-label="Music Player">
-      <span id="music-label">BGM</span>
-      <svg id="music-icon" viewBox="0 0 24 24" aria-label="Play BGM" title="Play/Pause BGM" tabindex="-1" role="button" class="disabled" data-state="paused">
-        <path id="music-icon-path" fill="#000" d="M8 5v14l11-7z"/>
-      </svg>
-      <canvas id="music-scope" width="60" height="16" aria-hidden="true"></canvas>
+      <span id="music-title" aria-live="polite"></span>
+      <button id="btn-music-mute" class="mute-btn" aria-label="Mute Music" title="Mute Music" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path id="music-spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
+          <path id="music-waves" d="M14 9c1.5 1.5 1.5 4.5 0 6m2.5-8.5c3 3 3 8 0 11" stroke="#000" stroke-width="2" fill="none"/>
+          <path id="music-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
+        </svg>
+      </button>
+      <span class="divider"></span>
+      <span style="font-size:12px;color:#222;">SFX</span>
+      <button id="btn-sfx-mute" class="mute-btn" aria-label="Mute SFX" title="Mute SFX" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path id="sfx-spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
+          <path id="sfx-waves" d="M14 9c1.5 1.5 1.5 4.5 0 6" stroke="#000" stroke-width="2" fill="none"/>
+          <path id="sfx-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
+        </svg>
+      </button>
       <!-- hidden SoundCloud widget iframe used for playback/control -->
       <iframe
         id="sc-widget"
@@ -403,71 +398,61 @@
     // --- Simple SoundCloud music player (hidden iframe) ---
     let scWidget = null;
   const scIframe = document.getElementById('sc-widget');
-  const musicIcon = document.getElementById('music-icon');
-  const musicIconPath = document.getElementById('music-icon-path');
-    const musicScope = document.getElementById('music-scope');
-    const scopeCtx = musicScope?.getContext('2d') || null;
-    let scopeAnimId = null;
-    let tick = 0;
-
-    function drawBars() {
-      if (!scopeCtx || !musicScope) return;
-      const w = musicScope.width, h = musicScope.height;
-      scopeCtx.clearRect(0, 0, w, h);
-      // Parameters for 6 tiny bars
-      const bars = 6;
-      const gap = 2;
-      const bw = Math.floor((w - gap * (bars - 1)) / bars);
-  const isPlaying = musicIcon?.dataset.state === 'playing';
-      const minPx = 2; // minimal height for paused bars
-      for (let i = 0; i < bars; i++) {
-        // When paused, show uniform minimal bars; when playing, vary heights over time
-        let barH;
-        if (!isPlaying) {
-          barH = minPx;
-        } else {
-          const base = 0.25; // base relative height
-          const amp = 0.6;
-          const val = base + amp * (0.5 + 0.5 * Math.sin((tick * 0.15) + i * 0.9));
-          barH = Math.max(minPx, Math.min(h, Math.round(val * h)));
-        }
-        const x = i * (bw + gap);
-        const y = h - barH;
-        scopeCtx.fillStyle = '#222';
-        scopeCtx.fillRect(x, y, bw, barH);
-      }
-    }
-    function startScope() {
-      if (scopeAnimId) return;
-      const step = () => {
-        tick++;
-        drawBars();
-        scopeAnimId = requestAnimationFrame(step);
-      };
-      scopeAnimId = requestAnimationFrame(step);
-    }
-    function stopScope() {
-      if (scopeAnimId) { cancelAnimationFrame(scopeAnimId); scopeAnimId = null; }
-      drawBars();
-    }
+  const musicTitleEl = document.getElementById('music-title');
+  const btnMusicMute = document.getElementById('btn-music-mute');
+  const btnSfxMute = document.getElementById('btn-sfx-mute');
+  let musicMuted = false;
+  let lastMusicVolume = 100; // percent
     let scReady = false;
     let desiredPlaying = false; // user's intended state; UI reflects actual state from widget
 
     function updateMusicUI(isPlaying) {
-      if (!musicIcon) return;
+      // No play/pause UI anymore; keep title current
       if (isPlaying) {
-        musicIcon.dataset.state = 'playing';
-        musicIcon.setAttribute('aria-label', 'Pause BGM');
-        musicIcon.title = 'Pause BGM';
-        if (musicIconPath) musicIconPath.setAttribute('d', 'M6 5h4v14H6zM14 5h4v14h-4z');
-        startScope();
-      } else {
-        musicIcon.dataset.state = 'paused';
-        musicIcon.setAttribute('aria-label', 'Play BGM');
-        musicIcon.title = 'Play BGM';
-        if (musicIconPath) musicIconPath.setAttribute('d', 'M8 5v14l11-7z');
-        stopScope();
+        updateMusicTitle();
       }
+    }
+
+    function updateMusicTitle() {
+      try {
+        if (scWidget) {
+          scWidget.getCurrentSound((sound) => {
+            if (musicTitleEl) musicTitleEl.textContent = (sound && sound.title) ? sound.title : '';
+          });
+        }
+      } catch(e) {}
+    }
+
+    function setMusicMuted(muted) {
+      musicMuted = !!muted;
+      try {
+        if (scWidget) {
+          if (musicMuted) scWidget.setVolume(0);
+          else scWidget.setVolume(lastMusicVolume);
+        }
+      } catch(e) {}
+      updateMusicMuteUI();
+    }
+    function updateMusicMuteUI() {
+      if (!btnMusicMute) return;
+      btnMusicMute.setAttribute('aria-pressed', musicMuted ? 'true' : 'false');
+      const waves = btnMusicMute.querySelector('#music-waves');
+      const x = btnMusicMute.querySelector('#music-x');
+      if (waves) waves.style.display = musicMuted ? 'none' : 'block';
+      if (x) x.style.display = musicMuted ? 'block' : 'none';
+      btnMusicMute.title = musicMuted ? 'Unmute Music' : 'Mute Music';
+      btnMusicMute.setAttribute('aria-label', btnMusicMute.title);
+    }
+    function updateSfxMuteUI() {
+      if (!btnSfxMute) return;
+      const muted = !sfxEnabled;
+      btnSfxMute.setAttribute('aria-pressed', muted ? 'true' : 'false');
+      const waves = btnSfxMute.querySelector('#sfx-waves');
+      const x = btnSfxMute.querySelector('#sfx-x');
+      if (waves) waves.style.display = muted ? 'none' : 'block';
+      if (x) x.style.display = muted ? 'block' : 'none';
+      btnSfxMute.title = muted ? 'Unmute SFX' : 'Mute SFX';
+      btnSfxMute.setAttribute('aria-label', btnSfxMute.title);
     }
 
     function syncMusicStateFromWidget() {
@@ -486,16 +471,13 @@
         // Ensure we start paused by default
         try { scWidget.pause(); } catch(e) {}
         desiredPlaying = false;
-        if (musicIcon) {
-          musicIcon.classList.remove('disabled');
-        }
-        // Initialize scope drawing (paused baseline) and sync UI from widget
-        stopScope();
+        // Update title and UI
+        updateMusicTitle();
         syncMusicStateFromWidget();
       });
 
       // Reflect actual play/pause events from the widget
-      scWidget.bind(SC.Widget.Events.PLAY, () => updateMusicUI(true));
+      scWidget.bind(SC.Widget.Events.PLAY, () => { updateMusicUI(true); });
       scWidget.bind(SC.Widget.Events.PAUSE, () => updateMusicUI(false));
 
       // Loop the same track when it finishes
@@ -507,21 +489,15 @@
         } catch(e) {}
       });
 
-      musicIcon?.addEventListener('click', () => {
-        if (!scReady) return;
-        // Toggle desired state, but update UI only when widget confirms via events
-        desiredPlaying = !desiredPlaying;
-        // Attempt to unlock audio (user gesture)
-        unlockAudioOnce();
-        try {
-          if (desiredPlaying) scWidget.play(); else scWidget.pause();
-        } catch(e) {}
-        // Fallback sync in case an event is missed (e.g., mobile autoplay quirks)
-        setTimeout(syncMusicStateFromWidget, 500);
+      // Wire mute buttons
+      btnMusicMute?.addEventListener('click', () => {
+        setMusicMuted(!musicMuted);
       });
-
-      // While loading: leave button disabled
-      if (musicIcon) { musicIcon.classList.add('disabled'); }
+      btnSfxMute?.addEventListener('click', () => {
+        sfxEnabled = !sfxEnabled;
+        updateSfxMuteUI();
+        if (sfxEnabled) beep(520, 70, 'square', 0.03);
+      });
     }
     // Setup desktop vs mobile UI elements (controls vs instructions)
     function setupInputUI() {
@@ -1412,6 +1388,9 @@
       });
       // Show menu and wait for Play to start the game loop state
       showStartMenu();
+      // Initialize topbar mute buttons UI
+      updateSfxMuteUI?.();
+      updateMusicMuteUI?.();
       requestAnimationFrame(frame);
     }
     // Resize handlers: refresh UI mode by width and resize canvas
@@ -1506,6 +1485,8 @@
     if (playBtn) {
       playBtn.addEventListener('click', () => {
         hideStartMenu();
+        // Auto-start music on game start
+        setMusicEnabled(true);
         restartGame();
       });
     }
