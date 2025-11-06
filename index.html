@@ -315,8 +315,8 @@
   <div id="startMenu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
     <img src="soar_title.png" alt="Soar Logo" class="menu-logo" />
     <h2 id="menuTitle">Welcome to Soar</h2>
-    <p class="menu-blurb">Step into the sky and take in the world from above.</p>
-    <p class="menu-note">Want to learn more about the event? <a id="event-link" href="#" target="_blank" rel="noopener">Read the details</a>.</p>
+    <p class="menu-blurb">So heaven waits, whether in wrath or grace, for one who rises, only by embrace.</p>
+    <p class="menu-note"><a id="event-link" href="#" target="_blank" rel="noopener">SOAR at Cakeshop Nov 21</a></p>
     <div class="menu-hr"></div>
     <div class="menu-row">
       <span class="row-label">Music</span>
@@ -749,8 +749,8 @@
     // -------- background tower --------
   const TOWER_SRC = 'resources/tower/tower.png';
   let towerImg = null;
-  const TOWER_SCALE = 2.0;      // make tower much larger
-  const TOWER_PARALLAX = 0.6;   // move a bit faster so top reveals sooner (0..1)
+  const TOWER_SCALE = 8.0;      // 4x bigger than previous (was 2.0)
+  const TOWER_PARALLAX = 0.6;   // unused for pixel-anchored tower
 
     // -------- difficulty (static) --------
   let MAX_CLOUD_SPACING = 150;
@@ -1431,6 +1431,29 @@
       // Draw static sky background covering the entire canvas
       drawScrollingSky();
 
+      // Draw background tower in pixel space, anchored to canvas bottom and behind ground.
+  // Lower it progressively as score increases; fully disappears into bottom around score 10000.
+      if (towerImg) {
+        ctx.save();
+        const tw = Math.round(towerImg.width * TOWER_SCALE);
+        const th = Math.round(towerImg.height * TOWER_SCALE);
+        const tx = Math.round((canvas.width - tw) / 2);
+  // Progress: 0 -> 1 as score goes 0 -> 10000
+  const p = Math.max(0, Math.min(1, (score || 0) / 10000));
+        // Draw a finite stack of tiles so the tower can fully disappear into the bottom at p=1
+        const nTiles = Math.ceil(canvas.height / th) + 1;
+        const offsetDown = p * (nTiles * th);
+        ctx.globalAlpha = 0.25; // 25% opacity
+        for (let i = 0; i < nTiles; i++) {
+          const y = Math.round(canvas.height - th + offsetDown - i * th);
+          if (y >= canvas.height) continue;      // fully below the canvas
+          if (y + th <= 0) break;                // fully above the canvas; remaining tiles are above too
+          ctx.drawImage(towerImg, 0, 0, towerImg.width, towerImg.height, tx, y, tw, th);
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
     // Compute world camera to keep the ground anchored to the pixel bottom
     const s = getDrawScale();
     const vw = viewWidth();
@@ -1445,44 +1468,9 @@
       ctx.translate(-camX, -camY);
 
   // World rendering (background already drawn in pixel space)
-      // Background tower (parallaxed, semi-transparent, tiles upward behind clouds)
-      if (towerImg) {
-        ctx.save();
-        // Apply parallax offset so tower moves slower than foreground
-        ctx.translate(0, camY * (1 - TOWER_PARALLAX));
-        const tw = Math.round(towerImg.width * TOWER_SCALE);
-        const th = Math.round(towerImg.height * TOWER_SCALE);
-        const tx = Math.round((viewWidth() - tw) / 2);
-        // Base bottom aligned to ground top
-        const baseBottom = ground.y + ground.height;
-        // Start drawing from the lowest tile that can appear
-        let y = Math.round(baseBottom - th);
-        const topVisible = camY - th;
-        const bottomVisible = camY + vh + th;
-        ctx.globalAlpha = 0.5; // requested 50% opacity
-        // Tile upward to cover the viewport area
-        while (y + th > topVisible) {
-          ctx.drawImage(towerImg, 0, 0, towerImg.width, towerImg.height, tx, y, tw, th);
-          y -= th;
-          // avoid infinite loops in case of NaN
-          if (!isFinite(y)) break;
-        }
-        ctx.globalAlpha = 1;
-        ctx.restore();
-      }
       for (let cloud of clouds) drawCloud(cloud);
       drawGround();
-      // Fog overlay above clouds/ground but below player (world space)
-      {
-        ctx.save();
-        const fog = ctx.createLinearGradient(0, camY, 0, camY + vh);
-        fog.addColorStop(0, 'rgba(255,255,255,0.35)');
-        fog.addColorStop(0.6, 'rgba(255,255,255,0.15)');
-        fog.addColorStop(1, 'rgba(255,255,255,0.05)');
-        ctx.fillStyle = fog;
-        ctx.fillRect(0, camY, viewWidth(), vh);
-        ctx.restore();
-      }
+      
       drawPlayer();
       drawParticles();
 
