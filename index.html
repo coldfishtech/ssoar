@@ -1517,6 +1517,8 @@
   setSfxEnabled(true);
   updateMusicMuteUI();
   updateSfxMuteUI();
+      // Ensure Game Over panel is not visible when the start menu is shown
+      hideGameOverMenu();
     }
     function hideStartMenu() {
       if (startMenuBackdrop) startMenuBackdrop.style.display = 'none';
