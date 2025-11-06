@@ -199,6 +199,8 @@
       color: #000;
       font-size: 14px;
       text-align: center;
+      display: flex; flex-direction: column; align-items: stretch;
+      box-sizing: border-box;
     }
     /* Add generous vertical spacing between each start menu section */
     #startMenu > * + * { margin-top: 16px; }
@@ -230,7 +232,7 @@
     /* Start menu logo (half the size of the top one which is 200px) */
     #startMenu .menu-logo { width: 100px; max-width: 40vw; height: auto; image-rendering: pixelated; display: block; margin: 0 auto 10px auto; }
     #startMenu .row-label { font-weight: 700; font-size: inherit; }
-  .menu-row { display: flex; align-items: center; justify-content: space-between; margin: 12px 0; }
+  .menu-row { display: flex; align-items: center; justify-content: space-between; margin: 12px 0; width: 100%; box-sizing: border-box; }
     .menu-btn, .menu-toggle {
       border: none; background: transparent; color: #000;
       border-radius: 6px; padding: 10px 14px; cursor: pointer; font-weight: 700;
@@ -238,6 +240,8 @@
     .menu-toggle { background: transparent; color: #000; }
     .menu-toggle[aria-pressed="true"] { background: transparent; color: #000; }
   .menu-actions { display: flex; justify-content: center; margin-top: 18px; }
+  /* Push the action row toward the bottom to mirror mock layout */
+  #startMenu .menu-actions { margin-top: auto; }
     .menu-actions .menu-btn { min-width: 140px; }
 
     /* Fantasy RPG panel styling */
