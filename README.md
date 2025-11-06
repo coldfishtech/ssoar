@@ -6,8 +6,10 @@
 
 SSOAR is a tiny, fast, and focused canvas platformer built for mobile and desktop. Hop between drifting clouds, rack up distance for score, and chase your personal best. On mobile, the game provides sleek on-screen controls; on desktop, use the arrow keys and Space to jump. Sound effects are lightweight and always available after your first tap.
 
-- Play online: https://yskysky.github.io/ssoar/
+- Play online: https://coldfishtech.github.io/ssoar/
 - Code: this repository (single-file `index.html`)
+
+Note: The game no longer includes an online leaderboard or any Supabase integration. Previous leaderboard setup instructions have been removed.
 
 ## Controls
 

@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>SSOAR: Touch the Sky</title>
   <script src="https://w.soundcloud.com/player/api.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     html {
       background: #f6f8fb; /* subtle cool off-white */
@@ -160,65 +159,7 @@
       canvas { width: 100%; height: auto; }
     }
 
-    /* Name overlay for mobile text input */
-    #name-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      display: none; /* shown via JS */
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      padding: 24px;
-    }
-    #name-modal {
-      width: 420px;
-      max-width: 100%;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-      padding: 20px 16px;
-      text-align: center;
-      box-sizing: border-box;
-    }
-    #name-modal h2 {
-      margin: 0 0 8px;
-      font-family: Arial Black, Arial, Helvetica, sans-serif;
-      font-size: 22px;
-      color: #111;
-    }
-    #name-modal p {
-      margin: 0 0 12px;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 14px;
-      color: #222;
-    }
-    #name-input {
-      width: 100%;
-      box-sizing: border-box;
-      font-family: Arial Black, Arial, Helvetica, sans-serif;
-      font-size: 18px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      border: 1px solid #b0b7c2;
-      margin: 6px 0 12px;
-    }
-    #name-continue {
-      width: 100%;
-      font-family: Arial Black, Arial, Helvetica, sans-serif;
-      font-size: 16px;
-      background: #4CAF50;
-      color: #fff;
-      border: 1px solid #45a049;
-      border-radius: 8px;
-      padding: 12px 14px;
-      cursor: pointer;
-    }
-    #name-continue:disabled {
-      background: #888;
-      border-color: #666;
-      cursor: not-allowed;
-    }
+    /* (removed) name overlay styles */
   </style>
 </head>
 <body>
@@ -243,15 +184,7 @@
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
   
-  <!-- Name entry overlay (used on mobile so soft keyboard appears) -->
-  <div id="name-overlay" role="dialog" aria-modal="true" aria-labelledby="name-title">
-    <div id="name-modal">
-      <h2 id="name-title">Welcome to SSOAR!</h2>
-      <p>Enter your name for the leaderboard:</p>
-      <input id="name-input" type="text" inputmode="latin" autocomplete="name" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" placeholder="Your name" />
-      <button id="name-continue" type="button" disabled>Continue</button>
-    </div>
-  </div>
+  <!-- (removed) name entry overlay -->
   
   <!-- Desktop instructions (hidden on mobile) -->
   <div id="desktop-instructions" aria-hidden="true" style="display:none;"></div>
@@ -263,90 +196,7 @@
     <button id="btn-jump" class="ctrl-btn ctrl-btn--jump" aria-label="Jump" title="Jump" tabindex="-1"></button>
   </div>
   <script>
-    // -------- Supabase Configuration --------
-    const SUPABASE_URL = 'https://yxwpfmkcdqenehspaguw.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4d3BmbWtjZHFlbmVoc3BhZ3V3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyODk1MTcsImV4cCI6MjA3NDg2NTUxN30.Bn2Zu9LX0qvURFU6h0oEKtXvbsPsLEnYWIoL1NHesqs';
-    
-    let supabaseClient = null;
-    let leaderboardEnabled = false;
-    
-    // Initialize Supabase client
-    function initSupabase() {
-      try {
-        // Check if Supabase is available globally
-        if (typeof supabase === 'undefined') {
-          console.warn('Supabase library not loaded');
-          leaderboardEnabled = false;
-          return;
-        }
-        
-        if (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY_HERE') {
-          supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          leaderboardEnabled = true;
-          console.log('Supabase initialized successfully');
-        } else {
-          console.log('Supabase credentials not configured - leaderboard disabled');
-          leaderboardEnabled = false;
-        }
-      } catch (error) {
-        console.warn('Supabase initialization failed:', error);
-        leaderboardEnabled = false;
-      }
-    }
-    
-    // Submit score to leaderboard
-    async function submitScore(playerName, finalScore) {
-      if (!leaderboardEnabled || !supabaseClient) return false;
-      
-      try {
-        const { data, error } = await supabaseClient
-          .from('leaderboard')
-          .insert([{ player_name: playerName, score: finalScore }]);
-        
-        if (error) throw error;
-        console.log('Score submitted:', finalScore);
-        return true;
-      } catch (error) {
-        console.error('Error submitting score:', error);
-        return false;
-      }
-    }
-    
-    // Get top scores from leaderboard
-    async function getTopScores(limit = 10) {
-      if (!leaderboardEnabled || !supabaseClient) return [];
-      
-      try {
-        const { data, error } = await supabaseClient
-          .from('leaderboard')
-          .select('player_name, score, created_at')
-          .order('score', { ascending: false })
-          .limit(limit);
-        
-        if (error) throw error;
-        return data || [];
-      } catch (error) {
-        console.error('Error fetching leaderboard:', error);
-        return [];
-      }
-    }
-
-    async function getUserRank(userScore) {
-      if (!leaderboardEnabled || !supabaseClient) return null;
-      
-      try {
-        const { count, error } = await supabaseClient
-          .from('leaderboard')
-          .select('*', { count: 'exact', head: true })
-          .gt('score', userScore);
-        
-        if (error) throw error;
-        return (count || 0) + 1; // Add 1 because rank is 1-based
-      } catch (error) {
-        console.error('Error fetching user rank:', error);
-        return null;
-      }
-    }
+    // (removed) leaderboard and Supabase configuration/functions
 
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
@@ -366,10 +216,6 @@
   const topbarEl = document.getElementById('topbar');
     const controlsEl = document.getElementById('controls');
   const desktopInstrEl = document.getElementById('desktop-instructions');
-  // Name overlay elements
-  const nameOverlayEl = document.getElementById('name-overlay');
-  const nameInputEl = document.getElementById('name-input');
-  const nameContinueEl = document.getElementById('name-continue');
 
     // Responsive sizing: fill available viewport between title and controls
   function sizeCanvasToViewport() {
@@ -564,28 +410,6 @@
         desktopInstrEl.textContent = INSTR_TEXT;
         // On desktop, keyboard is the primary input.
       }
-
-        // --- Name overlay controls ---
-        function showNameOverlay() {
-          if (!nameOverlayEl) return;
-          nameOverlayEl.style.display = 'flex';
-          // small delay to ensure paint before focus on some mobile browsers
-          setTimeout(() => {
-            if (nameInputEl) {
-              nameInputEl.value = playerName || '';
-              nameInputEl.focus();
-            }
-            updateNameContinueState();
-          }, 0);
-        }
-        function hideNameOverlay() {
-          if (!nameOverlayEl) return;
-          nameOverlayEl.style.display = 'none';
-        }
-        function updateNameContinueState() {
-          const valid = (nameInputEl?.value || '').trim().length > 0;
-          if (nameContinueEl) nameContinueEl.disabled = !valid;
-        }
     }
 
     // -------- core tunables --------
@@ -626,14 +450,7 @@
     // restart cooldown (ms)
     let restartCooldown = 0;
 
-  // Leaderboard state
-  let gameOverLeaderboardData = null;
-  let gameOverUserScoreEntry = null;
-  let gameOverUserRank = null;
-
-  // Player name management
-  let playerName = '';
-  let namePromptActive = false;
+  // (removed) leaderboard and player name state
 
   // Track if space is currently held
     let spaceHeld = false;
@@ -769,29 +586,6 @@
 
     // input
     window.addEventListener("keydown", e => {
-      // Handle name prompt during initial setup
-      if (namePromptActive) {
-        if (!isMobile && e.code === "Enter" && playerName.trim()) {
-          submitPlayerName();
-          e.preventDefault();
-          return;
-        }
-        if (e.code === "Backspace") {
-          playerName = playerName.slice(0, -1);
-          e.preventDefault();
-          return;
-        }
-        // Allow letters, numbers, and basic symbols
-        if (e.key.length === 1 && playerName.length < 20) {
-          const char = e.key;
-          if (/[a-zA-Z0-9\s_-]/.test(char)) {
-            playerName += char;
-          }
-        }
-        e.preventDefault();
-        return;
-      }
-      
       if (["ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
       keys[e.code] = true;
 
@@ -826,15 +620,7 @@
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       
-      if (namePromptActive) {
-        // Check for Continue button click in name prompt
-        const btnW = 120, btnH = 40;
-        const btnX = canvas.width/2 - btnW/2;
-        const btnY = canvas.height/2 + 80;
-        if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH && playerName.trim().length > 0) {
-          submitPlayerName();
-        }
-      } else if (!gameRunning) {
+      if (!gameRunning) {
         // Check for restart button click
         const btnW = 110, btnH = 44;
         const btnX = canvas.width/2 - btnW/2;
@@ -853,15 +639,7 @@
       const mx = touch.clientX - rect.left;
       const my = touch.clientY - rect.top;
       
-      if (namePromptActive) {
-        // Check for Continue button touch in name prompt
-        const btnW = 120, btnH = 40;
-        const btnX = canvas.width/2 - btnW/2;
-        const btnY = canvas.height/2 + 80;
-        if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH && playerName.trim().length > 0) {
-          submitPlayerName();
-        }
-      } else if (!gameRunning) {
+      if (!gameRunning) {
         // Check for restart button touch
         const btnW = 110, btnH = 44;
         const btnX = canvas.width/2 - btnW/2;
@@ -876,29 +654,6 @@
   const btnRight = document.getElementById('btn-right');
   const btnJump = document.getElementById('btn-jump');
   let desktopButtonsBound = false;
-
-    // Name overlay events
-    if (nameInputEl) {
-      nameInputEl.addEventListener('input', () => {
-        playerName = nameInputEl.value;
-        updateNameContinueState();
-      });
-      nameInputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && (nameInputEl.value || '').trim()) {
-          playerName = nameInputEl.value.trim();
-          submitPlayerName();
-          e.preventDefault();
-        }
-      });
-    }
-    if (nameContinueEl) {
-      nameContinueEl.addEventListener('click', () => {
-        if ((nameInputEl.value || '').trim()) {
-          playerName = nameInputEl.value.trim();
-          submitPlayerName();
-        }
-      });
-    }
 
     function bindControl(el, onPress) {
       if (!el) return;
@@ -1001,134 +756,12 @@
       arrowGroup.addEventListener('lostpointercapture', endSlide);
     }
 
-    // -------- Player Name Management --------
-    function loadPlayerName() {
-      try {
-        const saved = localStorage.getItem('cloudjump_player_name');
-        if (saved && saved.trim()) {
-          playerName = saved.trim();
-          return true;
-        }
-      } catch (e) {}
-      return false;
-    }
-    
-    function savePlayerName(name) {
-      try {
-        localStorage.setItem('cloudjump_player_name', name.trim());
-        playerName = name.trim();
-      } catch (e) {}
-    }
-    
-    function promptForName() {
-      if (!leaderboardEnabled) {
-        // Skip name prompt if leaderboard is disabled
-        return;
-      }
-      
-      namePromptActive = true;
-      playerName = '';
-      // On mobile, show an HTML overlay so the soft keyboard appears
-      if (isMobile) {
-        showNameOverlay();
-      }
-    }
+    // (removed) player name management
 
-    // -------- Leaderboard Functions --------
-    async function initGameOverLeaderboard() {
-      if (!leaderboardEnabled || !supabaseClient || !playerName) {
-        gameOverLeaderboardData = null;
-        gameOverUserScoreEntry = null;
-        gameOverUserRank = null;
-        return;
-      }
-      
-      gameOverUserScoreEntry = null;
-      gameOverUserRank = null;
-      
-      // Automatically submit the score
-      try {
-        const success = await submitScore(playerName, Math.floor(score));
-        if (success) {
-          gameOverUserScoreEntry = {
-            player_name: playerName,
-            score: Math.floor(score),
-            created_at: new Date().toISOString()
-          };
-        }
-      } catch (error) {
-        console.error('Failed to submit score:', error);
-      }
-      
-      // Load leaderboard data (top 10)
-      try {
-        gameOverLeaderboardData = await getTopScores(10);
-      } catch (error) {
-        console.error('Failed to load leaderboard:', error);
-        gameOverLeaderboardData = [];
-      }
-      
-      // Get user's rank if score was submitted
-      if (gameOverUserScoreEntry) {
-        try {
-          gameOverUserRank = await getUserRank(gameOverUserScoreEntry.score);
-        } catch (error) {
-          console.error('Failed to get user rank:', error);
-          gameOverUserRank = null;
-        }
-      }
-    }
+  // (removed) leaderboard functions
 
     // Draw name prompt overlay
-    function drawNamePrompt() {
-      ctx.fillStyle = "rgba(0,0,0,0.7)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#fff";
-      ctx.textAlign = "center";
-      
-      ctx.font = `32px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Welcome to SSOAR!", canvas.width/2, canvas.height/2 - 60);
-      
-      ctx.font = `18px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Enter your name for the leaderboard:", canvas.width/2, canvas.height/2 - 20);
-      
-      // Name input field
-      const displayName = playerName + '|';
-      ctx.font = `24px ${FONT_STACK_BOLD}`;
-      ctx.fillText(displayName, canvas.width/2, canvas.height/2 + 20);
-      
-      // Instructions
-      ctx.font = `14px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Press ENTER to confirm or tap button below", canvas.width/2, canvas.height/2 + 60);
-      
-      // Continue button
-      const btnW = 120, btnH = 40;
-      const btnX = canvas.width/2 - btnW/2;
-      const btnY = canvas.height/2 + 80;
-      
-      // Check if name is valid for button state
-      const isNameValid = playerName.trim().length > 0;
-      
-      ctx.fillStyle = isNameValid ? "#4CAF50" : "#888";
-      ctx.fillRect(btnX, btnY, btnW, btnH);
-      ctx.strokeStyle = isNameValid ? "#45a049" : "#666";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(btnX, btnY, btnW, btnH);
-      
-      ctx.fillStyle = "#fff";
-      ctx.font = `16px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Continue", canvas.width/2, btnY + btnH/2 + 6);
-      
-      ctx.textAlign = "left";
-    }
-
-    function submitPlayerName() {
-      if (playerName.trim().length > 0) {
-        savePlayerName(playerName.trim());
-        namePromptActive = false;
-        hideNameOverlay();
-      }
-    }
+    // (removed) name prompt drawing and submission
 
     function restartGame() {
       ground.x = 0;
@@ -1143,10 +776,7 @@
   score = 0; gameRunning = true; bgOffset = 0; paused = false;
   MAX_CLOUD_SPACING = 150; BASE_CLOUD_SPEED = 1.2; milestonePopup = null; nextMilestone = 1000;
 
-      // Reset leaderboard state
-      gameOverLeaderboardData = null;
-      gameOverUserScoreEntry = null;
-      gameOverUserRank = null;
+  // (removed) leaderboard state reset
 
       restartCooldown = 200;
       spaceHeld = false;
@@ -1309,8 +939,7 @@
           bestScore = score;
           try { localStorage.setItem("cloudjump_best", String(bestScore)); } catch(e) {}
         }
-        // Initialize leaderboard data for game over screen
-        initGameOverLeaderboard();
+        // (removed) leaderboard submission and loading
       }
 
       if (milestonePopup) {
@@ -1438,8 +1067,6 @@
       const titleFont = isMobileLayout ? "28px" : "36px";
       const scoreFont = isMobileLayout ? "24px" : "30px";
       const standardFont = isMobileLayout ? "14px" : "16px";
-      const leaderboardTitleFont = isMobileLayout ? "18px" : "20px";
-      const tableFont = isMobileLayout ? "12px" : "13px";
       
       // Start layout from top with proper spacing
       let yPos = isMobileLayout ? 40 : 60;
@@ -1458,118 +1085,7 @@
       ctx.font = `${standardFont} ${FONT_STACK_BOLD}`;
       ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, yPos);
       yPos += isMobileLayout ? 25 : 35;
-      
-      // Leaderboard section - always reserve space for maximum content
-      if (leaderboardEnabled) {
-        if (gameOverLeaderboardData) {
-          // Leaderboard title
-          ctx.font = `${leaderboardTitleFont} ${FONT_STACK_BOLD}`;
-          ctx.fillText("Leaderboard", canvas.width/2, yPos);
-        }
-        yPos += isMobileLayout ? 25 : 35; // Always advance regardless of data
-        
-        if (gameOverLeaderboardData) {
-          // Table formatting settings
-          const tableWidth = isMobileLayout ? 280 : 320;
-          const rankColWidth = 35;
-          const nameColWidth = isMobileLayout ? 160 : 200;
-          const scoreColWidth = isMobileLayout ? 85 : 85;
-          const leftMargin = (canvas.width - tableWidth) / 2;
-          const rankX = leftMargin;
-          const nameX = leftMargin + rankColWidth;
-          const scoreX = leftMargin + rankColWidth + nameColWidth;
-          const rowHeight = isMobileLayout ? 18 : 20;
-          
-          // Display top scores
-          ctx.font = `${tableFont} ${FONT_STACK_BOLD}`;
-          const displayCount = Math.min(10, gameOverLeaderboardData.length);
-          
-          for (let i = 0; i < displayCount; i++) {
-            const entry = gameOverLeaderboardData[i];
-            const rank = i + 1;
-            
-            // Highlight user's entry if it's in top 10
-            const isUserEntry = gameOverUserScoreEntry && 
-                               entry.player_name === gameOverUserScoreEntry.player_name && 
-                               entry.score === gameOverUserScoreEntry.score;
-            
-            if (isUserEntry) {
-              ctx.fillStyle = "#FFD700"; // Gold highlight for user
-            } else {
-              ctx.fillStyle = "#fff"; // Normal white text
-            }
-            
-            // Set text alignment for each column
-            ctx.textAlign = "right";
-            ctx.fillText(`${rank}.`, rankX + rankColWidth - 10, yPos);
-            
-            ctx.textAlign = "left";
-            ctx.fillText(entry.player_name, nameX, yPos);
-            
-            ctx.textAlign = "right";
-            ctx.fillText(entry.score.toString(), scoreX + scoreColWidth, yPos);
-            
-            yPos += rowHeight;
-          }
-          
-          ctx.fillStyle = "#fff"; // Reset color
-        }
-        
-        // Always reserve space for 10 entries
-        const rowHeight = isMobileLayout ? 18 : 20;
-        const maxEntries = 10;
-        const actualEntries = gameOverLeaderboardData ? Math.min(10, gameOverLeaderboardData.length) : 0;
-        const remainingRows = maxEntries - actualEntries;
-        yPos += remainingRows * rowHeight;
-        
-        // Always reserve space for user entry section (ellipsis + user row)
-        if (gameOverLeaderboardData && gameOverUserScoreEntry && gameOverUserRank && gameOverUserRank > 10) {
-          yPos += 10; // Gap before ellipsis
-          
-          // Show ellipsis
-          ctx.textAlign = "center";
-          ctx.fillText("...", canvas.width/2, yPos);
-          yPos += rowHeight;
-          
-          // Show user's entry highlighted
-          const tableWidth = isMobileLayout ? 280 : 320;
-          const rankColWidth = 35;
-          const nameColWidth = isMobileLayout ? 160 : 200;
-          const scoreColWidth = isMobileLayout ? 85 : 85;
-          const leftMargin = (canvas.width - tableWidth) / 2;
-          const rankX = leftMargin;
-          const nameX = leftMargin + rankColWidth;
-          const scoreX = leftMargin + rankColWidth + nameColWidth;
-          
-          ctx.fillStyle = "#FFD700"; // Gold highlight
-          
-          ctx.textAlign = "right";
-          ctx.fillText(`${gameOverUserRank}.`, rankX + rankColWidth - 10, yPos);
-          
-          ctx.textAlign = "left";
-          ctx.fillText(gameOverUserScoreEntry.player_name, nameX, yPos);
-          
-          ctx.textAlign = "right";
-          ctx.fillText(gameOverUserScoreEntry.score.toString(), scoreX + scoreColWidth, yPos);
-          
-          ctx.fillStyle = "#fff"; // Reset color
-          yPos += rowHeight;
-        } else {
-          // Reserve space even if user is not shown below top 10
-          yPos += 10 + rowHeight + rowHeight; // Gap + ellipsis + user entry space
-        }
-        
-        ctx.textAlign = "center"; // Reset text alignment
-        yPos += 15; // Standard spacing after leaderboard section
-        
-      } else {
-        // If leaderboard is disabled, still reserve the same amount of space
-        const rowHeight = isMobileLayout ? 18 : 20;
-        yPos += (isMobileLayout ? 25 : 35); // Title space
-        yPos += 10 * rowHeight; // 10 rows space
-        yPos += 10 + rowHeight + rowHeight; // User entry space
-        yPos += 15; // Standard spacing
-      }
+      // No leaderboard: leave clean space and move to restart
       
       // Add some padding before restart button
       yPos += isMobileLayout ? 15 : 20;
@@ -1595,23 +1111,12 @@
     }
 
     function getRestartButtonPosition() {
-      // Calculate fixed position based on maximum possible leaderboard size
+      // Position restart button comfortably below text, without leaderboard
       const isMobileLayout = canvas.height < 600;
-      let yPos = isMobileLayout ? 40 : 60; // Initial yPos
-      yPos += isMobileLayout ? 35 : 50; // Title spacing
-      yPos += isMobileLayout ? 30 : 40; // Score spacing  
-      yPos += isMobileLayout ? 25 : 35; // Best score spacing
-      
-      // Always reserve space for maximum leaderboard content
-      yPos += isMobileLayout ? 25 : 35; // Leaderboard title spacing
-      
-      const rowHeight = isMobileLayout ? 18 : 20;
-      yPos += 10 * rowHeight; // Always reserve space for 10 entries
-      yPos += 10 + rowHeight + rowHeight; // Always reserve space for user entry section
-      yPos += 15; // Standard spacing after leaderboard
-      
-      yPos += isMobileLayout ? 15 : 20; // Padding before button
-      return Math.max(yPos, canvas.height - (isMobileLayout ? 80 : 120));
+      const bottomMargin = isMobileLayout ? 80 : 120;
+      // target 65% height but ensure some bottom margin
+      const target = Math.floor(canvas.height * 0.65);
+      return Math.min(target, canvas.height - bottomMargin);
     }
 
     function draw() {
@@ -1658,7 +1163,6 @@
       }
 
   if (!gameRunning) drawGameOver();
-  if (namePromptActive && !isMobile) drawNamePrompt();
     }
 
     // -------- loop --------
@@ -1672,16 +1176,9 @@
 
     // Initialize music and start game loop
     function bootstrap() {
-      initSupabase();
       sizeCanvasToViewport();
       initMusic();
       setupInputUI();
-      
-      // Check for existing player name, prompt if needed
-      if (!loadPlayerName()) {
-        promptForName();
-        if (isMobile) showNameOverlay();
-      }
       
       // Unlock WebAudio on first user interaction so SFX can play even if BGM stays off
       const unlockers = ['pointerdown', 'touchstart', 'keydown'];
