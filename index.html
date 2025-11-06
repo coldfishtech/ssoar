@@ -1234,8 +1234,8 @@
         score += Math.floor(diff);
         // Trigger milestone popup for every 1000 points crossed
         while (score >= nextMilestone) {
-          // Start a bit lower so it stays visible near the top of the canvas
-          milestonePopup = { scoreNumber: nextMilestone, y: 100, alpha: 0.5 };
+          // Show near the top of the canvas with 50px padding
+          milestonePopup = { scoreNumber: nextMilestone, y: 50, alpha: 0.5 };
           playLevelUpSFX();
           nextMilestone += 1000;
         }
@@ -1272,8 +1272,8 @@
       }
 
       if (milestonePopup) {
-        // Rise gently but do not go above a top clamp to keep it visible near the top edge
-        milestonePopup.y = Math.max(64, milestonePopup.y - 0.6);
+        // Keep the popup at least 50px from the top edge
+        milestonePopup.y = Math.max(50, milestonePopup.y - 1);
         milestonePopup.alpha -= 0.02;
         if (milestonePopup.alpha <= 0) milestonePopup = null;
       }
