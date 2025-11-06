@@ -171,6 +171,45 @@
     }
 
     /* (removed) name overlay styles */
+
+    /* Start menu overlay */
+    #startMenuBackdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: none; /* shown when menu active */
+      z-index: 10;
+    }
+    #startMenu {
+      position: fixed;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      background: #ffffff;
+      border: 1px solid #b0b7c2;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      border-radius: 8px;
+      width: min(360px, 90vw);
+      padding: 16px;
+      display: none; /* shown when menu active */
+      z-index: 11;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #000;
+    }
+    #startMenu h2 {
+      margin: 0 0 12px 0;
+      font-weight: 700;
+      font-size: 18px;
+      text-align: center;
+    }
+    .menu-row { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
+    .menu-btn, .menu-toggle {
+      border: 1px solid #b0b7c2; background: #222; color: #fff;
+      border-radius: 6px; padding: 10px 14px; cursor: pointer; font-weight: 700;
+    }
+    .menu-toggle { background: #fff; color: #222; }
+    .menu-toggle[aria-pressed="true"] { background: #222; color: #fff; }
+    .menu-actions { display: flex; justify-content: center; margin-top: 12px; }
+    .menu-actions .menu-btn { min-width: 140px; }
   </style>
 </head>
 <body>
@@ -194,6 +233,22 @@
     </div>
   </div>
   <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <!-- Start Menu Overlay -->
+  <div id="startMenuBackdrop" aria-hidden="true"></div>
+  <div id="startMenu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+    <h2 id="menuTitle">Start Menu</h2>
+    <div class="menu-row">
+      <span>Music</span>
+      <button id="toggle-music" class="menu-toggle" type="button" aria-pressed="false">Off</button>
+    </div>
+    <div class="menu-row">
+      <span>SFX</span>
+      <button id="toggle-sfx" class="menu-toggle" type="button" aria-pressed="true">On</button>
+    </div>
+    <div class="menu-actions">
+      <button id="btn-play" class="menu-btn" type="button">Play Game</button>
+    </div>
+  </div>
   
   <!-- (removed) name entry overlay -->
   
@@ -644,6 +699,7 @@
     // Basic AudioContext SFX
     let audioCtx = null;
     let audioUnlocked = false;
+    let sfxEnabled = true; // toggled by Start Menu
     function ensureAudio() {
       if (!audioCtx) {
         try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioCtx = null; }
@@ -657,6 +713,7 @@
       audioUnlocked = true;
     }
     function beep(freq = 440, durMs = 100, type = "sine", gain = 0.05) {
+      if (!sfxEnabled) return;
       ensureAudio();
       if (!audioCtx) return;
       if (audioCtx.state === 'suspended') {
@@ -737,6 +794,7 @@
   let bestScore = Number(localStorage.getItem("cloudjump_best") || 0);
     let gameRunning = true;
     let gameOverSFXPlayed = false;
+  let menuActive = true; // show start menu until Play
   const keys = {};
 
     // input
@@ -946,6 +1004,7 @@
   // Difficulty ramps with score thresholds (every 1000 points), without levels UI
 
     function update(dt) {
+      if (menuActive) return; // freeze game until Play
       if (!gameRunning) {
         // Freeze popup state during game over
         return;
@@ -1367,7 +1426,7 @@
         ctx.textAlign = "left";
       }
 
-  if (!gameRunning) drawGameOver();
+  if (!gameRunning && !menuActive) drawGameOver();
     }
 
     // -------- loop --------
@@ -1392,7 +1451,8 @@
       unlockers.forEach(ev => {
         window.addEventListener(ev, unlockAudioOnce, { once: true, passive: ev !== 'keydown' });
       });
-      restartGame();
+      // Show menu and wait for Play to start the game loop state
+      showStartMenu();
       requestAnimationFrame(frame);
     }
     // Resize handlers: refresh UI mode by width and resize canvas
@@ -1413,6 +1473,72 @@
       setTimeout(bootstrap, 0);
     } else {
       window.addEventListener('DOMContentLoaded', () => setTimeout(bootstrap, 0));
+    }
+  </script>
+  <script>
+    // ----- Start Menu logic -----
+    const startMenu = document.getElementById('startMenu');
+    const startMenuBackdrop = document.getElementById('startMenuBackdrop');
+    const playBtn = document.getElementById('btn-play');
+    const toggleMusicBtn = document.getElementById('toggle-music');
+    const toggleSfxBtn = document.getElementById('toggle-sfx');
+
+    function showStartMenu() {
+      if (startMenuBackdrop) startMenuBackdrop.style.display = 'block';
+      if (startMenu) startMenu.style.display = 'block';
+      menuActive = true;
+      // Initialize toggles: Music off, SFX on (reflect current states)
+      updateMusicToggleUI(false);
+      updateSfxToggleUI(sfxEnabled);
+    }
+    function hideStartMenu() {
+      if (startMenuBackdrop) startMenuBackdrop.style.display = 'none';
+      if (startMenu) startMenu.style.display = 'none';
+      menuActive = false;
+    }
+
+    function updateMusicToggleUI(on) {
+      if (!toggleMusicBtn) return;
+      toggleMusicBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      toggleMusicBtn.textContent = on ? 'On' : 'Off';
+    }
+    function updateSfxToggleUI(on) {
+      if (!toggleSfxBtn) return;
+      toggleSfxBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      toggleSfxBtn.textContent = on ? 'On' : 'Off';
+    }
+
+    function setMusicEnabled(on) {
+      desiredPlaying = !!on;
+      try {
+        if (scReady && scWidget) {
+          if (on) scWidget.play(); else scWidget.pause();
+        }
+      } catch(e) {}
+      // Sync icon/UI after widget processes
+      setTimeout(syncMusicStateFromWidget, 200);
+      updateMusicToggleUI(on);
+    }
+
+    if (playBtn) {
+      playBtn.addEventListener('click', () => {
+        hideStartMenu();
+        restartGame();
+      });
+    }
+    if (toggleMusicBtn) {
+      toggleMusicBtn.addEventListener('click', () => {
+        const next = toggleMusicBtn.getAttribute('aria-pressed') !== 'true';
+        setMusicEnabled(next);
+      });
+    }
+    if (toggleSfxBtn) {
+      toggleSfxBtn.addEventListener('click', () => {
+        sfxEnabled = !(toggleSfxBtn.getAttribute('aria-pressed') === 'true');
+        updateSfxToggleUI(sfxEnabled);
+        // give a tiny confirm ping when turning on
+        if (sfxEnabled) beep(520, 70, 'square', 0.03);
+      });
     }
   </script>
 </body>
