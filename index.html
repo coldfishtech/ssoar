@@ -768,10 +768,9 @@
   let BASE_CLOUD_SPEED = 1.2;
 
 
-  // milestone: trigger a brief effect on the main HUD score every 1000 points
+  // milestone popup (every 1000 score)
+  let milestonePopup = null;
   let nextMilestone = 1000;
-  let scoreEffectTime = 0; // ms remaining for HUD score effect
-  const SCORE_EFFECT_DURATION = 1200; // ms
 
     // restart cooldown (ms)
     let restartCooldown = 0;
@@ -1091,7 +1090,7 @@
       player.dx = 0; player.dy = 0; player.canJump = true;
 
   score = 0; gameRunning = true; bgOffset = 0; paused = false;
-  MAX_CLOUD_SPACING = 150; BASE_CLOUD_SPEED = 1.2; nextMilestone = 1000; scoreEffectTime = 0;
+  MAX_CLOUD_SPACING = 150; BASE_CLOUD_SPEED = 1.2; milestonePopup = null; nextMilestone = 1000;
 
   // (removed) leaderboard state reset
 
@@ -1235,8 +1234,7 @@
         score += Math.floor(diff);
         // Trigger milestone popup for every 1000 points crossed
         while (score >= nextMilestone) {
-          // trigger HUD score effect
-          scoreEffectTime = SCORE_EFFECT_DURATION;
+          milestonePopup = { scoreNumber: nextMilestone, y: 72, alpha: 0.5 };
           playLevelUpSFX();
           nextMilestone += 1000;
         }
@@ -1272,8 +1270,11 @@
         showGameOverMenu();
       }
 
-      // tick down HUD score effect timer
-      if (scoreEffectTime > 0) scoreEffectTime = Math.max(0, scoreEffectTime - delta);
+      if (milestonePopup) {
+        milestonePopup.y -= 1;
+        milestonePopup.alpha -= 0.02;
+        if (milestonePopup.alpha <= 0) milestonePopup = null;
+      }
       updateParticles(delta);
       // Update animation controller (after physics)
       playerAnim.update(delta, {
@@ -1414,27 +1415,7 @@
       const scoreText = String(Math.floor(score));
       // Base score draw
       drawTextWithLetterSpacing(ctx, scoreText, margin, margin, spacingPx);
-      // Overlay effect on milestone: position at bottom-right of main score, scale up, and fade out over time
-      if (scoreEffectTime > 0) {
-        const p = scoreEffectTime / SCORE_EFFECT_DURATION; // 1 -> 0
-        const scale = 1 + 0.70 * p; // doubled effect: up to +70% scale
-        const xShift = 10 * p; // nudge to the right up to 10px
-        const yShift = 10 * p; // drop down up to 10px
-        // compute text width with letter spacing to anchor at bottom-right of the base score
-        let w = 0;
-        for (let i = 0; i < scoreText.length; i++) {
-          const ch = scoreText[i];
-          w += Math.round(ctx.measureText(ch).width + spacingPx);
-        }
-        ctx.save();
-        ctx.globalAlpha = 0.55 * p; // fade out
-        // translate to bottom-right corner of the base score, plus a small bottom-right shift
-        ctx.translate(margin + w + xShift, margin + fontPx + yShift);
-        ctx.scale(scale, scale);
-        // draw anchored so that (-w, -fontPx) is the top-left of the text box
-        drawTextWithLetterSpacing(ctx, scoreText, -w, -fontPx, spacingPx);
-        ctx.restore();
-      }
+      // milestone effect now drawn as center popup (handled outside HUD)
 
       // show pause indicator below score
       const pauseY = margin + fontPx + 2;
@@ -1506,7 +1487,15 @@
       // Reset to pixel space for HUD/overlays (keeps UI crisp and stable)
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       drawHUD();
-      // (removed) center milestone popup; effect now shown on HUD score
+      if (milestonePopup) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${milestonePopup.alpha})`;
+        ctx.textAlign = "center";
+        const numberSize = 132;
+        ctx.font = `${numberSize}px ${FONT_STACK_BOLD}`;
+        const sub = String(milestonePopup.scoreNumber);
+        ctx.fillText(sub, canvas.width/2, milestonePopup.y);
+        ctx.textAlign = "left";
+      }
 
   // (removed) canvas-drawn Game Over; DOM overlay handles it now
     }
