@@ -965,7 +965,7 @@
         player.y = ground.y - player.height;
         player.canJump = true;
         if (!wasCanJump) beep(220, 60, "sine", 0.03); // land SFX
-        if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 8);
+        if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 8, '#ffffff');
       }
 
       for (let cloud of clouds) {
@@ -981,7 +981,7 @@
           player.canJump = true;
           onCloud = cloud;
           if (!wasCanJump) beep(220, 60, "sine", 0.03); // land SFX
-          if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 6);
+          if (!wasCanJump) spawnPuff(player.x + player.width/2, player.y + player.height, 6, '#ffffff');
         }
       }
 
