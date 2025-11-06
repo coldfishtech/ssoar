@@ -226,6 +226,9 @@
     }
   // Width-based mobile flag (<= 600px)
   let isMobile = computeIsMobile();
+  // Soft minimum play area height (px). Prefer at least this much canvas height
+  // when space allows, but never exceed available viewport height.
+  const MIN_PLAY_HEIGHT = 300;
   const titleImgEl = document.getElementById('titleImage');
   const topbarEl = document.getElementById('topbar');
     const controlsEl = document.getElementById('controls');
@@ -260,8 +263,11 @@
   // Width/Height rules:
   // - Small screens: fill width and use available height
   // - Desktop: keep width 400, but cap height to available space (<= 600)
+  // Apply soft minimum height so play area doesn't get too tiny.
   const targetW = isSmall ? Math.max(200, vw - (padLeft + padRight)) : 400;
-  const targetH = Math.min(isSmall ? availableH : 600, availableH);
+  const desiredH = isSmall ? availableH : Math.min(600, availableH);
+  const minH = Math.min(MIN_PLAY_HEIGHT, availableH);
+  const targetH = Math.max(minH, desiredH);
 
       // Set CSS size for layout
       canvas.style.width = targetW + 'px';
