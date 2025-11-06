@@ -738,8 +738,10 @@
   let standingOnCloud = false; // frame flag for rendering micro-overlap
   
     // -------- background tower --------
-    const TOWER_SRC = 'resources/tower/tower.png';
-    let towerImg = null;
+  const TOWER_SRC = 'resources/tower/tower.png';
+  let towerImg = null;
+  const TOWER_SCALE = 2.0;      // make tower much larger
+  const TOWER_PARALLAX = 0.3;   // move slower than world (0..1)
 
     // -------- difficulty (static) --------
   let MAX_CLOUD_SPACING = 150;
@@ -1423,12 +1425,39 @@
       ctx.translate(-camX, -camY);
 
   // World rendering (background already drawn in pixel space)
-      // Background tower (drawn behind clouds and player)
+      // Background tower (parallaxed, semi-transparent, tiles upward behind clouds)
       if (towerImg) {
-        // Place tower centered horizontally; bottom sits on ground top edge
-        const tx = Math.round((viewWidth() - towerImg.width) / 2);
-        const ty = Math.round(ground.y + ground.height - towerImg.height);
-        ctx.drawImage(towerImg, tx, ty);
+        ctx.save();
+        // Apply parallax offset so tower moves slower than foreground
+        ctx.translate(0, camY * (1 - TOWER_PARALLAX));
+        const tw = Math.round(towerImg.width * TOWER_SCALE);
+        const th = Math.round(towerImg.height * TOWER_SCALE);
+        const tx = Math.round((viewWidth() - tw) / 2);
+        // Base bottom aligned to ground top
+        const baseBottom = ground.y + ground.height;
+        // Start drawing from the lowest tile that can appear
+        let y = Math.round(baseBottom - th);
+        const topVisible = camY - th;
+        const bottomVisible = camY + vh + th;
+        ctx.globalAlpha = 0.5; // requested 50% opacity
+        // Tile upward to cover the viewport area
+        while (y + th > topVisible) {
+          ctx.drawImage(towerImg, 0, 0, towerImg.width, towerImg.height, tx, y, tw, th);
+          y -= th;
+          // avoid infinite loops in case of NaN
+          if (!isFinite(y)) break;
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
+        // Light fog layer behind clouds/player (world space, no parallax)
+        ctx.save();
+        const fog = ctx.createLinearGradient(0, camY, 0, camY + vh);
+        fog.addColorStop(0, 'rgba(255,255,255,0.35)');
+        fog.addColorStop(0.6, 'rgba(255,255,255,0.15)');
+        fog.addColorStop(1, 'rgba(255,255,255,0.05)');
+        ctx.fillStyle = fog;
+        ctx.fillRect(0, camY, viewWidth(), vh);
+        ctx.restore();
       }
       for (let cloud of clouds) drawCloud(cloud);
       drawGround();
