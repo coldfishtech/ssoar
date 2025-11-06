@@ -57,7 +57,16 @@
       font-weight: 900;
     }
     /* Music/SFX topbar UI */
-    #music-title { font-size: 12px; font-weight: 900; color: #222; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Override the bold parent for specific elements to be Arial regular 9pt with -10 tracking (~ -0.01em) */
+    #music-title,
+    #musicbar .musicbar-label {
+      font-family: Arial, Helvetica, sans-serif;
+      font-weight: 400;
+      font-size: 9pt;            /* ~12px */
+      letter-spacing: -0.01em;   /* -10 tracking */
+      color: #222;
+    }
+    #music-title { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mute-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 4px; cursor: pointer; }
     .mute-btn svg { width: 14px; height: 14px; display: block; }
     .divider { width: 1px; height: 16px; background: #b0b7c2; display: inline-block; margin: 0 6px; }
@@ -280,7 +289,7 @@
   <div id="topbar">
   <img id="titleImage" src="soar_title.png" alt="SSOAR Title" />
     <div id="musicbar" aria-label="Music Player">
-      <span id="music-title" aria-live="polite"></span>
+  <span id="music-title" aria-live="polite"></span>
       <button id="btn-music-mute" class="mute-btn" aria-label="Mute Music" title="Mute Music" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
@@ -288,8 +297,8 @@
           <path class="mute-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
         </svg>
       </button>
-      <span class="divider"></span>
-      <span style="font-size:12px;color:#222;">SFX</span>
+  <span class="divider"></span>
+  <span class="musicbar-label">SFX</span>
       <button id="btn-sfx-mute" class="mute-btn" aria-label="Mute SFX" title="Mute SFX" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
@@ -752,7 +761,7 @@
   const TOWER_SCALE = 8.0;      // 4x bigger than previous (was 2.0)
   const TOWER_PARALLAX = 0.6;   // unused for pixel-anchored tower
   // Score at which the tower fully disappears into the bottom edge
-  const TOWER_HIDE_SCORE = 4000;
+  const TOWER_HIDE_SCORE = 12000;
 
     // -------- difficulty (static) --------
   let MAX_CLOUD_SPACING = 150;
