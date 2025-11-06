@@ -227,6 +227,16 @@
     .menu-toggle[aria-pressed="true"] { background: transparent; color: #000; }
     .menu-actions { display: flex; justify-content: center; margin-top: 12px; }
     .menu-actions .menu-btn { min-width: 140px; }
+
+    /* Fantasy RPG panel styling */
+    .rpg-panel { color: #2b1b0e; font-family: Georgia, "Times New Roman", serif; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
+    .rpg-title { font-variant: small-caps; letter-spacing: 0.08em; font-weight: 800; font-size: 18px; text-align: center; color: #2b1b0e; }
+    .rpg-subtitle { font-variant: small-caps; letter-spacing: 0.06em; text-align: center; color: #3b2716; font-size: 12px; margin-top: 6px; }
+    .rpg-prose { color: #3b2716; font-size: 12px; line-height: 1.35; text-align: center; margin: 6px 2px 8px; }
+    .rpg-hr { height: 1px; background: linear-gradient(90deg, rgba(43,27,14,0), rgba(43,27,14,0.6), rgba(43,27,14,0)); border: 0; margin: 8px 4px; }
+    .rpg-btn { font-variant: small-caps; letter-spacing: 0.08em; color: #2b1b0e; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+    .rpg-btn:active { filter: none; transform: translateY(0); opacity: 0.8; }
+    .rpg-row-label { font-variant: small-caps; letter-spacing: 0.06em; color: #2b1b0e; font-weight: 700; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -265,10 +275,12 @@
   <!-- Start Menu Overlay -->
   <div id="startMenuBackdrop" aria-hidden="true"></div>
   <img id="startMenuFrame" src="resources/frame/frame.png" alt="Frame" aria-hidden="true"/>
-  <div id="startMenu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
-    <h2 id="menuTitle">Start Menu</h2>
+  <div id="startMenu" role="dialog" aria-modal="true" aria-labelledby="menuTitle" class="rpg-panel">
+    <h2 id="menuTitle" class="rpg-title">Prologue: The Skies of Soar</h2>
+    <div class="rpg-prose">Young sojourner, the winds whisper your name. Step upon the floating roads and let your courage find its wings.</div>
+    <div class="rpg-hr"></div>
     <div class="menu-row">
-      <span>Music</span>
+      <span class="rpg-row-label">Bard’s Tune</span>
       <button id="sm-btn-music-mute" class="mute-btn" aria-label="Mute Music" title="Mute Music" aria-pressed="false" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
@@ -278,7 +290,7 @@
       </button>
     </div>
     <div class="menu-row">
-      <span>SFX</span>
+      <span class="rpg-row-label">Spirit Echoes</span>
       <button id="sm-btn-sfx-mute" class="mute-btn" aria-label="Mute SFX" title="Mute SFX" aria-pressed="false" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
@@ -288,16 +300,19 @@
       </button>
     </div>
     <div class="menu-actions">
-      <button id="btn-play" class="menu-btn" type="button">Play Game</button>
+      <button id="btn-play" class="menu-btn rpg-btn" type="button">Begin the Ascent</button>
     </div>
   </div>
   <!-- Game Over Overlay -->
-  <div id="gameOver" role="dialog" aria-modal="true" aria-labelledby="goTitle">
-    <h2 id="goTitle">Game Over</h2>
+  <div id="gameOver" role="dialog" aria-modal="true" aria-labelledby="goTitle" class="rpg-panel">
+    <h2 id="goTitle" class="rpg-title">Epilogue: A Gentle Descent</h2>
+    <div class="rpg-prose">The sky is patient, and so are the winds. Each fall is a lesson; each rise, a legend yet unwritten.</div>
+    <div class="rpg-hr"></div>
+    <div class="rpg-subtitle">Height Reached</div>
     <div class="score" id="goScore">0</div>
-    <div class="best" id="goBest">Best: 0</div>
+    <div class="best" id="goBest">Record: 0</div>
     <div class="menu-actions">
-      <button id="btn-restart" class="menu-btn" type="button">Play Again</button>
+      <button id="btn-restart" class="menu-btn rpg-btn" type="button">Rise Again</button>
     </div>
   </div>
   
@@ -1462,7 +1477,7 @@
       if (startMenuBackdrop) startMenuBackdrop.style.display = 'block';
       if (startMenuFrameImg) startMenuFrameImg.style.display = 'block';
       if (goScoreEl) goScoreEl.textContent = String(Math.floor(score));
-      if (goBestEl) goBestEl.textContent = 'Best: ' + Math.floor(bestScore);
+      if (goBestEl) goBestEl.textContent = 'Record: ' + Math.floor(bestScore);
       if (gameOverPanel) gameOverPanel.style.display = 'block';
     }
     function hideGameOverMenu() {
