@@ -457,33 +457,33 @@
       walkFrameDurationBase: 110, // ms at base speed
       jumpWindupMs: 50, // requested 50ms wind-up
       // async loading of all frames
-      async load() {
+  async load() {
         const files = {
           Still: { L: 'Still_L.png', R: 'Still_R.png' },
           JumpReady: { L: 'JumpReady_L.png', R: 'JumpReady_R.png' },
           Jump: { L: 'Jump_L.png', R: 'Jump_R.png' },
           Falling: { L: 'Falling_L.png', R: 'Falling_R.png' },
           Walking: {
-            L: ['Walking_L_1.png','Walking_L_2.png','Walking_L_3.png','Walking_L_4.png'],
-            R: ['Walking_R_1.png','Walking_R_2.png','Walking_R_3.png','Walking_R_4.png']
+            L: ['Walking_L_1.png','Walking_L_2.png','Walking_L_3.png'],
+            R: ['Walking_R_1.png','Walking_R_2.png','Walking_R_3.png']
           }
         };
         const loadDir = async (name) => loadImage(SPRITE_BASE + name);
         const [stillL, stillR, jrL, jrR, jL, jR, fL, fR,
-               wL1, wL2, wL3, wL4, wR1, wR2, wR3, wR4] = await Promise.all([
+               wL1, wL2, wL3, wR1, wR2, wR3] = await Promise.all([
           loadDir(files.Still.L), loadDir(files.Still.R),
           loadDir(files.JumpReady.L), loadDir(files.JumpReady.R),
           loadDir(files.Jump.L), loadDir(files.Jump.R),
           loadDir(files.Falling.L), loadDir(files.Falling.R),
-          loadDir(files.Walking.L[0]), loadDir(files.Walking.L[1]), loadDir(files.Walking.L[2]), loadDir(files.Walking.L[3]),
-          loadDir(files.Walking.R[0]), loadDir(files.Walking.R[1]), loadDir(files.Walking.R[2]), loadDir(files.Walking.R[3])
+          loadDir(files.Walking.L[0]), loadDir(files.Walking.L[1]), loadDir(files.Walking.L[2]),
+          loadDir(files.Walking.R[0]), loadDir(files.Walking.R[1]), loadDir(files.Walking.R[2])
         ]);
         this.images = {
           Still: { L: stillL, R: stillR },
           JumpReady: { L: jrL, R: jrR },
           Jump: { L: jL, R: jR },
           Falling: { L: fL, R: fR },
-          Walking: { L: [wL1, wL2, wL3, wL4], R: [wR1, wR2, wR3, wR4] }
+          Walking: { L: [wL1, wL2, wL3], R: [wR1, wR2, wR3] }
         };
         this.loaded = true;
       },
@@ -512,9 +512,10 @@
           const norm = Math.max(0.1, speed / playerSpeed);
           const frameDur = this.walkFrameDurationBase * (1 / Math.sqrt(norm));
           this.walkTimer += dt;
+          const frameCount = 3;
           while (this.walkTimer >= frameDur) {
             this.walkTimer -= frameDur;
-            this.walkFrameIndex = (this.walkFrameIndex + 1) % 4;
+            this.walkFrameIndex = (this.walkFrameIndex + 1) % frameCount;
           }
         } else {
           // reset when switching out of walk for crisp restart
