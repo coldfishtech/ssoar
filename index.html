@@ -252,12 +252,16 @@
   const bodyGap = 8; // small gaps between sections
 
       // Available height for canvas: viewport minus occupied elements and small gaps
-  const availableH = Math.max(200, vh - (padTop + padBottom + topbarH + controlsH + instrH + bodyGap * 4));
+      // Do not enforce a large minimum here; keep canvas within available viewport so
+      // controls (mobile) or instructions (desktop) always remain visible.
+      const availableH = Math.max(0, vh - (padTop + padBottom + topbarH + controlsH + instrH + bodyGap * 4));
 
   const isSmall = vw <= 600;
-  // Width/Height rules: on small screens, fill width and available height; on desktop, keep original 400x600
+  // Width/Height rules:
+  // - Small screens: fill width and use available height
+  // - Desktop: keep width 400, but cap height to available space (<= 600)
   const targetW = isSmall ? Math.max(200, vw - (padLeft + padRight)) : 400;
-  const targetH = isSmall ? availableH : 600;
+  const targetH = Math.min(isSmall ? availableH : 600, availableH);
 
       // Set CSS size for layout
       canvas.style.width = targetW + 'px';
