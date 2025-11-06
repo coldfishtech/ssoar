@@ -215,15 +215,29 @@
       box-shadow: none;
       border-radius: 0;
       width: min(240px, 58.5vw);
-      padding: 16px;
+      padding: 10px 24px; /* match start menu top/bottom */
       display: none;
       z-index: 12; /* above frame */
       font-family: Arial, Helvetica, sans-serif;
       color: #000;
+      font-size: 14px;
+      text-align: center;
+      display: flex; flex-direction: column; align-items: stretch;
+      box-sizing: border-box;
     }
-    #gameOver h2 { margin: 0 0 8px 0; font-weight: 700; font-size: 18px; text-align: center; }
+    /* Space stack like start menu */
+    #gameOver > * + * { margin-top: 16px; }
+    #gameOver h2 { margin: 6px 0 10px 0; font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: inherit; text-align: center; }
     #gameOver .score { text-align: center; font-weight: 900; font-size: 48px; margin: 6px 0; }
     #gameOver .best { text-align: center; font-weight: 700; font-size: 14px; margin: 0 0 8px 0; }
+    /* Shared helpers for divider, labels and top image */
+    #gameOver .menu-hr { height: 1px; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,0.35), rgba(0,0,0,0)); border: 0; margin: 12px 4px; }
+    #gameOver .row-label { font-weight: 700; font-size: inherit; }
+    #gameOver .go-sprite { width: 64px; height: auto; image-rendering: pixelated; display: block; margin: 0 auto 6px auto; }
+    .menu-actions { display: flex; justify-content: center; }
+    #gameOver .menu-actions { margin-top: auto; }
+    /* Reuse row layout if needed within game over */
+    #gameOver .menu-row { display: flex; align-items: center; justify-content: space-between; margin: 12px 0; width: 100%; box-sizing: border-box; }
     #startMenu h2 { margin: 6px 0 10px 0; font-family: Arial Black, Arial, Helvetica, sans-serif; font-weight: 900; font-size: inherit; }
     /* Start menu copy and divider */
     #startMenu .menu-blurb, #startMenu .menu-note { margin: 10px 4px; line-height: 1.3; font-size: inherit; }
@@ -322,15 +336,15 @@
     </div>
   </div>
   <!-- Game Over Overlay -->
-  <div id="gameOver" role="dialog" aria-modal="true" aria-labelledby="goTitle" class="rpg-panel">
-    <h2 id="goTitle" class="rpg-title">Epilogue: A Gentle Descent</h2>
-    <div class="rpg-prose">The sky is patient, and so are the winds. Each fall is a lesson; each rise, a legend yet unwritten.</div>
-    <div class="rpg-hr"></div>
-    <div class="rpg-subtitle">Height Reached</div>
+  <div id="gameOver" role="dialog" aria-modal="true" aria-labelledby="goTitle">
+    <img src="resources/sprites/player/Falling_R.png" alt="Falling" class="go-sprite" />
+    <h2 id="goTitle">Game Over</h2>
+    <div class="menu-hr"></div>
+    <div class="row-label">Height Reached</div>
     <div class="score" id="goScore">0</div>
     <div class="best" id="goBest">Record: 0</div>
     <div class="menu-actions">
-      <button id="btn-restart" class="menu-btn rpg-btn" type="button">Rise Again</button>
+      <button id="btn-restart" class="menu-btn" type="button">Play Again</button>
     </div>
   </div>
   
