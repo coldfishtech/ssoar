@@ -207,6 +207,25 @@
       font-family: Arial, Helvetica, sans-serif;
       color: #000;
     }
+    /* Game Over dialog shares the same look as the start menu */
+    #gameOver {
+      position: fixed;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      border-radius: 0;
+      width: min(320px, 78vw);
+      padding: 16px;
+      display: none;
+      z-index: 12; /* above frame */
+      font-family: Arial, Helvetica, sans-serif;
+      color: #000;
+    }
+    #gameOver h2 { margin: 0 0 8px 0; font-weight: 700; font-size: 18px; text-align: center; }
+    #gameOver .score { text-align: center; font-weight: 900; font-size: 48px; margin: 6px 0; }
+    #gameOver .best { text-align: center; font-weight: 700; font-size: 14px; margin: 0 0 8px 0; }
     #startMenu h2 {
       margin: 0 0 12px 0;
       font-weight: 700;
@@ -260,6 +279,15 @@
     </div>
     <div class="menu-actions">
       <button id="btn-play" class="menu-btn" type="button">Play Game</button>
+    </div>
+  </div>
+  <!-- Game Over Overlay -->
+  <div id="gameOver" role="dialog" aria-modal="true" aria-labelledby="goTitle">
+    <h2 id="goTitle">Game Over</h2>
+    <div class="score" id="goScore">0</div>
+    <div class="best" id="goBest">Best: 0</div>
+    <div class="menu-actions">
+      <button id="btn-restart" class="menu-btn" type="button">Play Again</button>
     </div>
   </div>
   
@@ -841,40 +869,7 @@
       }
     });
 
-    canvas.addEventListener("click", e => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-      
-      if (!gameRunning) {
-        // Check for restart button click
-        const btnW = 110, btnH = 44;
-        const btnX = canvas.width/2 - btnW/2;
-        const btnY = getRestartButtonPosition();
-        if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH) {
-          restartGame();
-        }
-      }
-    });
-
-    // Also handle touch events for mobile
-    canvas.addEventListener("touchend", e => {
-      e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const touch = e.changedTouches[0];
-      const mx = touch.clientX - rect.left;
-      const my = touch.clientY - rect.top;
-      
-      if (!gameRunning) {
-        // Check for restart button touch
-        const btnW = 110, btnH = 44;
-        const btnX = canvas.width/2 - btnW/2;
-        const btnY = getRestartButtonPosition();
-        if (mx >= btnX && mx <= btnX+btnW && my >= btnY && my <= btnY+btnH) {
-          restartGame();
-        }
-      }
-    });
+    // (removed) canvas-based restart hit-test; now handled by DOM game over dialog
 
     const btnLeft = document.getElementById('btn-left');
   const btnRight = document.getElementById('btn-right');
@@ -1012,6 +1007,7 @@
 
       initClouds();
       gameOverSFXPlayed = false;
+      hideGameOverMenu();
     }
 
   // Difficulty ramps with score thresholds (every 1000 points), without levels UI
@@ -1176,6 +1172,7 @@
           try { localStorage.setItem("cloudjump_best", String(bestScore)); } catch(e) {}
         }
         // (removed) leaderboard submission and loading
+        showGameOverMenu();
       }
 
       if (milestonePopup) {
@@ -1330,59 +1327,7 @@
       ctx.textBaseline = prevBaseline;
     }
 
-    function drawGameOver() {
-      ctx.fillStyle = "rgba(0,0,0,0.45)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#fff";
-      ctx.textAlign = "center";
-      
-      // Responsive font sizes for mobile
-      const isMobileLayout = canvas.height < 600;
-      const titleFont = isMobileLayout ? "28px" : "36px";
-      const scoreFont = isMobileLayout ? "24px" : "30px";
-      const standardFont = isMobileLayout ? "14px" : "16px";
-      
-      // Start layout from top with proper spacing
-      let yPos = isMobileLayout ? 40 : 60;
-      
-      // Game Over title
-      ctx.font = `${titleFont} ${FONT_STACK_BOLD}`;
-      ctx.fillText("Game Over", canvas.width/2, yPos);
-      yPos += isMobileLayout ? 35 : 50;
-      
-      // Current score
-      ctx.font = `${scoreFont} ${FONT_STACK_BOLD}`;
-      ctx.fillText(String(Math.floor(score)), canvas.width/2, yPos);
-      yPos += isMobileLayout ? 30 : 40;
-      
-      // Best score
-      ctx.font = `${standardFont} ${FONT_STACK_BOLD}`;
-      ctx.fillText("Best: " + Math.floor(bestScore), canvas.width/2, yPos);
-      yPos += isMobileLayout ? 25 : 35;
-      // No leaderboard: leave clean space and move to restart
-      
-      // Add some padding before restart button
-      yPos += isMobileLayout ? 15 : 20;
-      
-      // Restart button - positioned dynamically based on content above
-      const btnW = 110, btnH = 44;
-      const btnX = canvas.width/2 - btnW/2;
-      const btnY = getRestartButtonPosition();
-      
-      ctx.fillStyle = "#222";
-      ctx.fillRect(btnX, btnY, btnW, btnH);
-      ctx.fillStyle = "#fff";
-      ctx.font = `20px ${FONT_STACK_BOLD}`;
-      ctx.fillText("Restart", canvas.width/2, btnY + btnH/2 + 7);
-
-      // Controls hint
-      ctx.font = `12px ${FONT_STACK_BOLD}`;
-      if (!isMobile) {
-        ctx.fillText("Press SPACE to Restart", canvas.width/2, btnY + btnH + 20);
-      }
-
-      ctx.textAlign = "left";
-    }
+    // (removed) canvas-drawn Game Over; now uses DOM overlay
 
     function getRestartButtonPosition() {
       // Position restart button comfortably below text, without leaderboard
@@ -1439,7 +1384,7 @@
         ctx.textAlign = "left";
       }
 
-  if (!gameRunning && !menuActive) drawGameOver();
+  // (removed) canvas-drawn Game Over; DOM overlay handles it now
     }
 
     // -------- loop --------
@@ -1496,6 +1441,11 @@
     const playBtn = document.getElementById('btn-play');
     const toggleMusicBtn = document.getElementById('toggle-music');
     const toggleSfxBtn = document.getElementById('toggle-sfx');
+    // Game Over elements
+    const gameOverPanel = document.getElementById('gameOver');
+    const goScoreEl = document.getElementById('goScore');
+    const goBestEl = document.getElementById('goBest');
+    const restartBtn = document.getElementById('btn-restart');
 
     function showStartMenu() {
       if (startMenuBackdrop) startMenuBackdrop.style.display = 'block';
@@ -1511,6 +1461,22 @@
       if (startMenuFrameImg) startMenuFrameImg.style.display = 'none';
       if (startMenu) startMenu.style.display = 'none';
       menuActive = false;
+    }
+
+    function showGameOverMenu() {
+      if (startMenuBackdrop) startMenuBackdrop.style.display = 'block';
+      if (startMenuFrameImg) startMenuFrameImg.style.display = 'block';
+      if (goScoreEl) goScoreEl.textContent = String(Math.floor(score));
+      if (goBestEl) goBestEl.textContent = 'Best: ' + Math.floor(bestScore);
+      if (gameOverPanel) gameOverPanel.style.display = 'block';
+    }
+    function hideGameOverMenu() {
+      if (gameOverPanel) gameOverPanel.style.display = 'none';
+      // If start menu isn't shown, hide frame/backdrop too
+      if (!menuActive) {
+        if (startMenuBackdrop) startMenuBackdrop.style.display = 'none';
+        if (startMenuFrameImg) startMenuFrameImg.style.display = 'none';
+      }
     }
 
     function updateMusicToggleUI(on) {
@@ -1554,6 +1520,12 @@
         updateSfxToggleUI(sfxEnabled);
         // give a tiny confirm ping when turning on
         if (sfxEnabled) beep(520, 70, 'square', 0.03);
+      });
+    }
+    if (restartBtn) {
+      restartBtn.addEventListener('click', () => {
+        hideGameOverMenu();
+        restartGame();
       });
     }
   </script>
