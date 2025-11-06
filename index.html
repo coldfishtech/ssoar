@@ -159,6 +159,8 @@
         transform: scale(1.2);
         transform-origin: center center;
       }
+      /* Hide desktop-only labels on mobile */
+      .desktop-only { display: none; }
     }
 
     /* (removed) name overlay styles */
@@ -254,6 +256,8 @@
     .menu-toggle { background: transparent; color: #000; }
     .menu-toggle[aria-pressed="true"] { background: transparent; color: #000; }
   .menu-actions { display: flex; justify-content: center; margin-top: 18px; }
+  .menu-instruction { font-size: 12px; color: #000; opacity: 0.85; margin-top: 6px; text-align: center; }
+  .desktop-only { display: block; }
   /* Push the action row toward the bottom to mirror mock layout */
   #startMenu .menu-actions { margin-top: auto; }
     .menu-actions .menu-btn { min-width: 140px; }
@@ -334,6 +338,7 @@
     <div class="menu-actions">
       <button id="btn-play" class="menu-btn" type="button">Play Game</button>
     </div>
+    <div class="menu-instruction desktop-only">or press space</div>
   </div>
   <!-- Game Over Overlay -->
   <div id="gameOver" role="dialog" aria-modal="true" aria-labelledby="goTitle">
@@ -346,6 +351,7 @@
     <div class="menu-actions">
       <button id="btn-restart" class="menu-btn" type="button">Play Again</button>
     </div>
+    <div class="menu-instruction desktop-only">or press space</div>
   </div>
   
   <!-- (removed) name entry overlay -->
@@ -907,7 +913,18 @@
       if (["ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
       keys[e.code] = true;
 
-      if (!gameRunning && e.code === "Space") {
+      // Desktop: allow starting the game from the Start Menu with Space
+      if (!isMobile && e.code === "Space" && menuActive) {
+        hideStartMenu();
+        setMusicEnabled(true);
+        restartGame();
+        // Prevent immediate jump on first frame after starting via Space
+        keys["Space"] = false;
+        spaceHeld = false;
+        return;
+      }
+
+      if (!menuActive && !gameRunning && e.code === "Space") {
         restartGame();
         keys["Space"] = false;
         spaceHeld = true; // treat it as held after restart
@@ -1512,7 +1529,8 @@
         window.addEventListener(ev, unlockAudioOnce, { once: true, passive: ev !== 'keydown' });
       });
       // Show menu and wait for Play to start the game loop state
-      showStartMenu();
+  hideGameOverMenu();
+  showStartMenu();
       // Initialize topbar mute buttons UI
       refreshAudioButtonRefs();
       updateSfxMuteUI?.();
