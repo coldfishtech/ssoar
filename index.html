@@ -1275,11 +1275,70 @@
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    // Ground: solid black without concrete texture
+    // Concrete ground style with cracks texture
+    let concretePattern = null;
+    function getConcretePattern() {
+      if (concretePattern) return concretePattern;
+      const off = document.createElement('canvas');
+      off.width = 64; off.height = 64;
+      const c = off.getContext('2d');
+      // base concrete color
+      c.fillStyle = '#4a4f57';
+      c.fillRect(0, 0, off.width, off.height);
+      // subtle noise speckles
+      const imgData = c.getImageData(0,0,off.width,off.height);
+      for (let i = 0; i < imgData.data.length; i += 4) {
+        const n = (Math.random()*30)|0; // 0..29
+        imgData.data[i]   = Math.max(0, imgData.data[i]   - n);
+        imgData.data[i+1] = Math.max(0, imgData.data[i+1] - n);
+        imgData.data[i+2] = Math.max(0, imgData.data[i+2] - n);
+      }
+      c.putImageData(imgData, 0, 0);
+      // cracks: draw randomized branched lines
+      c.strokeStyle = 'rgba(20,22,25,0.6)';
+      c.lineWidth = 1;
+      c.lineCap = 'round';
+      function crack(x, y, len, angle, depth=0) {
+        c.beginPath();
+        c.moveTo(x, y);
+        const step = 4 + Math.random()*3;
+        let cx = x, cy = y, a = angle;
+        for (let t = 0; t < len; t += step) {
+          a += (Math.random()-0.5) * 0.3; // slight jitter
+          cx += Math.cos(a) * step;
+          cy += Math.sin(a) * step;
+          c.lineTo(cx, cy);
+          // occasional branch
+          if (depth < 2 && Math.random() < 0.1) {
+            crack(cx, cy, len * 0.25, a + (Math.random()<0.5?-1:1)*(0.6+Math.random()*0.6), depth+1);
+          }
+        }
+        c.stroke();
+      }
+      for (let i = 0; i < 6; i++) {
+        const sx = Math.random()*off.width;
+        const sy = Math.random()*off.height;
+        const ang = Math.random()*Math.PI*2;
+        crack(sx, sy, 36 + Math.random()*28, ang);
+      }
+      concretePattern = ctx.createPattern(off, 'repeat');
+      return concretePattern;
+    }
+
     function drawGround() {
       if (!groundActive) return;
-      ctx.fillStyle = '#000000';
+      // fill with dark concrete base
+      ctx.fillStyle = '#3f444b';
       ctx.fillRect(0, ground.y, viewWidth(), ground.height);
+      // overlay cracks pattern
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = getConcretePattern();
+      ctx.fillRect(0, ground.y, viewWidth(), ground.height);
+      ctx.restore();
+      // subtle top highlight to separate from air
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(0, ground.y, viewWidth(), 3);
     }
     function drawPlayer() {
       const yOff = standingOnCloud ? CLOUD_OVERLAP_DRAW : 0;
