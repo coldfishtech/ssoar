@@ -741,7 +741,7 @@
   const TOWER_SRC = 'resources/tower/tower.png';
   let towerImg = null;
   const TOWER_SCALE = 2.0;      // make tower much larger
-  const TOWER_PARALLAX = 0.3;   // move slower than world (0..1)
+  const TOWER_PARALLAX = 0.6;   // move a bit faster so top reveals sooner (0..1)
 
     // -------- difficulty (static) --------
   let MAX_CLOUD_SPACING = 150;
@@ -1449,7 +1449,11 @@
         }
         ctx.globalAlpha = 1;
         ctx.restore();
-        // Light fog layer behind clouds/player (world space, no parallax)
+      }
+      for (let cloud of clouds) drawCloud(cloud);
+      drawGround();
+      // Fog overlay above clouds/ground but below player (world space)
+      {
         ctx.save();
         const fog = ctx.createLinearGradient(0, camY, 0, camY + vh);
         fog.addColorStop(0, 'rgba(255,255,255,0.35)');
@@ -1459,8 +1463,6 @@
         ctx.fillRect(0, camY, viewWidth(), vh);
         ctx.restore();
       }
-      for (let cloud of clouds) drawCloud(cloud);
-      drawGround();
       drawPlayer();
       drawParticles();
 
