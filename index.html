@@ -180,18 +180,30 @@
       display: none; /* shown when menu active */
       z-index: 10;
     }
+    /* Centered decorative frame image under the menu */
+    #startMenuFrame {
+      position: fixed;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(420px, 92vw);
+      height: auto;
+      display: none;
+      z-index: 11;
+      pointer-events: none;
+      image-rendering: pixelated;
+    }
     #startMenu {
       position: fixed;
       left: 50%; top: 50%;
       transform: translate(-50%, -50%);
-      background: #ffffff;
-      border: 1px solid #b0b7c2;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-      border-radius: 8px;
-      width: min(360px, 90vw);
+      background: transparent; /* use frame image for chrome */
+      border: none;
+      box-shadow: none;
+      border-radius: 0;
+      width: min(320px, 78vw);
       padding: 16px;
       display: none; /* shown when menu active */
-      z-index: 11;
+      z-index: 12; /* above frame */
       font-family: Arial, Helvetica, sans-serif;
       color: #000;
     }
@@ -235,6 +247,7 @@
   <canvas id="gameCanvas" width="400" height="600"></canvas>
   <!-- Start Menu Overlay -->
   <div id="startMenuBackdrop" aria-hidden="true"></div>
+  <img id="startMenuFrame" src="resources/frame/frame.png" alt="Frame" aria-hidden="true"/>
   <div id="startMenu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
     <h2 id="menuTitle">Start Menu</h2>
     <div class="menu-row">
@@ -1479,12 +1492,14 @@
     // ----- Start Menu logic -----
     const startMenu = document.getElementById('startMenu');
     const startMenuBackdrop = document.getElementById('startMenuBackdrop');
+  const startMenuFrameImg = document.getElementById('startMenuFrame');
     const playBtn = document.getElementById('btn-play');
     const toggleMusicBtn = document.getElementById('toggle-music');
     const toggleSfxBtn = document.getElementById('toggle-sfx');
 
     function showStartMenu() {
       if (startMenuBackdrop) startMenuBackdrop.style.display = 'block';
+      if (startMenuFrameImg) startMenuFrameImg.style.display = 'block';
       if (startMenu) startMenu.style.display = 'block';
       menuActive = true;
       // Initialize toggles: Music off, SFX on (reflect current states)
@@ -1493,6 +1508,7 @@
     }
     function hideStartMenu() {
       if (startMenuBackdrop) startMenuBackdrop.style.display = 'none';
+      if (startMenuFrameImg) startMenuFrameImg.style.display = 'none';
       if (startMenu) startMenu.style.display = 'none';
       menuActive = false;
     }
