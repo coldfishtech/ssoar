@@ -58,9 +58,11 @@
     }
     /* Music/SFX topbar UI */
     #music-title { font-size: 12px; font-weight: 900; color: #222; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .mute-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #b0b7c2; border-radius: 4px; cursor: pointer; }
+  .mute-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 4px; cursor: pointer; }
     .mute-btn svg { width: 14px; height: 14px; display: block; }
     .divider { width: 1px; height: 16px; background: #b0b7c2; display: inline-block; margin: 0 6px; }
+  /* Make all buttons have no fill or stroke (no background or border) */
+  button { background: transparent; border: none; }
     
     canvas {
       background: transparent; /* the canvas draws its own sky, page around is off-white */
@@ -218,11 +220,11 @@
     }
     .menu-row { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
     .menu-btn, .menu-toggle {
-      border: 1px solid #b0b7c2; background: #222; color: #fff;
+      border: none; background: transparent; color: #000;
       border-radius: 6px; padding: 10px 14px; cursor: pointer; font-weight: 700;
     }
-    .menu-toggle { background: #fff; color: #222; }
-    .menu-toggle[aria-pressed="true"] { background: #222; color: #fff; }
+    .menu-toggle { background: transparent; color: #000; }
+    .menu-toggle[aria-pressed="true"] { background: transparent; color: #000; }
     .menu-actions { display: flex; justify-content: center; margin-top: 12px; }
     .menu-actions .menu-btn { min-width: 140px; }
   </style>
@@ -234,18 +236,18 @@
       <span id="music-title" aria-live="polite"></span>
       <button id="btn-music-mute" class="mute-btn" aria-label="Mute Music" title="Mute Music" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path id="music-spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
-          <path id="music-waves" d="M14 9c1.5 1.5 1.5 4.5 0 6m2.5-8.5c3 3 3 8 0 11" stroke="#000" stroke-width="2" fill="none"/>
-          <path id="music-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
+          <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
+          <path class="waves" d="M14 9c1.5 1.5 1.5 4.5 0 6m2.5-8.5c3 3 3 8 0 11" stroke="#000" stroke-width="2" fill="none"/>
+          <path class="mute-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
         </svg>
       </button>
       <span class="divider"></span>
       <span style="font-size:12px;color:#222;">SFX</span>
       <button id="btn-sfx-mute" class="mute-btn" aria-label="Mute SFX" title="Mute SFX" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path id="sfx-spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
-          <path id="sfx-waves" d="M14 9c1.5 1.5 1.5 4.5 0 6" stroke="#000" stroke-width="2" fill="none"/>
-          <path id="sfx-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
+          <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
+          <path class="waves" d="M14 9c1.5 1.5 1.5 4.5 0 6" stroke="#000" stroke-width="2" fill="none"/>
+          <path class="mute-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
         </svg>
       </button>
       <!-- hidden SoundCloud widget iframe used for playback/control -->
@@ -267,11 +269,23 @@
     <h2 id="menuTitle">Start Menu</h2>
     <div class="menu-row">
       <span>Music</span>
-      <button id="toggle-music" class="menu-toggle" type="button" aria-pressed="false">Off</button>
+      <button id="sm-btn-music-mute" class="mute-btn" aria-label="Mute Music" title="Mute Music" aria-pressed="false" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
+          <path class="waves" d="M14 9c1.5 1.5 1.5 4.5 0 6m2.5-8.5c3 3 3 8 0 11" stroke="#000" stroke-width="2" fill="none"/>
+          <path class="mute-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
+        </svg>
+      </button>
     </div>
     <div class="menu-row">
       <span>SFX</span>
-      <button id="toggle-sfx" class="menu-toggle" type="button" aria-pressed="true">On</button>
+      <button id="sm-btn-sfx-mute" class="mute-btn" aria-label="Mute SFX" title="Mute SFX" aria-pressed="false" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path class="spk" fill="#000" d="M3 9v6h4l5 4V5L7 9H3z"/>
+          <path class="waves" d="M14 9c1.5 1.5 1.5 4.5 0 6" stroke="#000" stroke-width="2" fill="none"/>
+          <path class="mute-x" d="M16 6 L22 12 M22 6 L16 12" stroke="#000" stroke-width="2" style="display:none"/>
+        </svg>
+      </button>
     </div>
     <div class="menu-actions">
       <button id="btn-play" class="menu-btn" type="button">Play Game</button>
@@ -401,6 +415,8 @@
   const musicTitleEl = document.getElementById('music-title');
   const btnMusicMute = document.getElementById('btn-music-mute');
   const btnSfxMute = document.getElementById('btn-sfx-mute');
+  const smBtnMusicMute = document.getElementById('sm-btn-music-mute');
+  const smBtnSfxMute = document.getElementById('sm-btn-sfx-mute');
   let musicMuted = false;
   let lastMusicVolume = 100; // percent
     let scReady = false;
@@ -433,26 +449,28 @@
       } catch(e) {}
       updateMusicMuteUI();
     }
-    function updateMusicMuteUI() {
-      if (!btnMusicMute) return;
-      btnMusicMute.setAttribute('aria-pressed', musicMuted ? 'true' : 'false');
-      const waves = btnMusicMute.querySelector('#music-waves');
-      const x = btnMusicMute.querySelector('#music-x');
-      if (waves) waves.style.display = musicMuted ? 'none' : 'block';
-      if (x) x.style.display = musicMuted ? 'block' : 'none';
-      btnMusicMute.title = musicMuted ? 'Unmute Music' : 'Mute Music';
-      btnMusicMute.setAttribute('aria-label', btnMusicMute.title);
-    }
-    function updateSfxMuteUI() {
-      if (!btnSfxMute) return;
-      const muted = !sfxEnabled;
-      btnSfxMute.setAttribute('aria-pressed', muted ? 'true' : 'false');
-      const waves = btnSfxMute.querySelector('#sfx-waves');
-      const x = btnSfxMute.querySelector('#sfx-x');
+    function updateSpeakerButtonVisual(btnEl, muted) {
+      if (!btnEl) return;
+      btnEl.setAttribute('aria-pressed', muted ? 'true' : 'false');
+      const waves = btnEl.querySelector('.waves');
+      const x = btnEl.querySelector('.mute-x');
       if (waves) waves.style.display = muted ? 'none' : 'block';
       if (x) x.style.display = muted ? 'block' : 'none';
-      btnSfxMute.title = muted ? 'Unmute SFX' : 'Mute SFX';
-      btnSfxMute.setAttribute('aria-label', btnSfxMute.title);
+      btnEl.title = muted ? 'Unmute' : 'Mute';
+      btnEl.setAttribute('aria-label', btnEl.title);
+    }
+    function updateMusicMuteUI() {
+      updateSpeakerButtonVisual(btnMusicMute, musicMuted);
+      updateSpeakerButtonVisual(smBtnMusicMute, musicMuted);
+    }
+    function setSfxEnabled(on) {
+      sfxEnabled = !!on;
+      updateSfxMuteUI();
+    }
+    function updateSfxMuteUI() {
+      const muted = !sfxEnabled;
+      updateSpeakerButtonVisual(btnSfxMute, muted);
+      updateSpeakerButtonVisual(smBtnSfxMute, muted);
     }
 
     function syncMusicStateFromWidget() {
@@ -489,15 +507,12 @@
         } catch(e) {}
       });
 
-      // Wire mute buttons
-      btnMusicMute?.addEventListener('click', () => {
-        setMusicMuted(!musicMuted);
-      });
-      btnSfxMute?.addEventListener('click', () => {
-        sfxEnabled = !sfxEnabled;
-        updateSfxMuteUI();
-        if (sfxEnabled) beep(520, 70, 'square', 0.03);
-      });
+      // Wire mute buttons (top bar and start menu)
+      const wire = (el, fn) => { el && el.addEventListener('click', fn); };
+      wire(btnMusicMute, () => setMusicMuted(!musicMuted));
+      wire(smBtnMusicMute, () => setMusicMuted(!musicMuted));
+      wire(btnSfxMute, () => { setSfxEnabled(!sfxEnabled); if (sfxEnabled) beep(520, 70, 'square', 0.03); });
+      wire(smBtnSfxMute, () => { setSfxEnabled(!sfxEnabled); if (sfxEnabled) beep(520, 70, 'square', 0.03); });
     }
     // Setup desktop vs mobile UI elements (controls vs instructions)
     function setupInputUI() {
@@ -1419,8 +1434,6 @@
     const startMenuBackdrop = document.getElementById('startMenuBackdrop');
   const startMenuFrameImg = document.getElementById('startMenuFrame');
     const playBtn = document.getElementById('btn-play');
-    const toggleMusicBtn = document.getElementById('toggle-music');
-    const toggleSfxBtn = document.getElementById('toggle-sfx');
     // Game Over elements
     const gameOverPanel = document.getElementById('gameOver');
     const goScoreEl = document.getElementById('goScore');
@@ -1432,9 +1445,11 @@
       if (startMenuFrameImg) startMenuFrameImg.style.display = 'block';
       if (startMenu) startMenu.style.display = 'block';
       menuActive = true;
-      // Initialize toggles: Music off, SFX on (reflect current states)
-      updateMusicToggleUI(false);
-      updateSfxToggleUI(sfxEnabled);
+  // Defaults on start screen: both unmuted
+  setMusicMuted(false);
+  setSfxEnabled(true);
+  updateMusicMuteUI();
+  updateSfxMuteUI();
     }
     function hideStartMenu() {
       if (startMenuBackdrop) startMenuBackdrop.style.display = 'none';
@@ -1459,17 +1474,6 @@
       }
     }
 
-    function updateMusicToggleUI(on) {
-      if (!toggleMusicBtn) return;
-      toggleMusicBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      toggleMusicBtn.textContent = on ? 'On' : 'Off';
-    }
-    function updateSfxToggleUI(on) {
-      if (!toggleSfxBtn) return;
-      toggleSfxBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      toggleSfxBtn.textContent = on ? 'On' : 'Off';
-    }
-
     function setMusicEnabled(on) {
       desiredPlaying = !!on;
       try {
@@ -1479,7 +1483,6 @@
       } catch(e) {}
       // Sync icon/UI after widget processes
       setTimeout(syncMusicStateFromWidget, 200);
-      updateMusicToggleUI(on);
     }
 
     if (playBtn) {
@@ -1490,20 +1493,7 @@
         restartGame();
       });
     }
-    if (toggleMusicBtn) {
-      toggleMusicBtn.addEventListener('click', () => {
-        const next = toggleMusicBtn.getAttribute('aria-pressed') !== 'true';
-        setMusicEnabled(next);
-      });
-    }
-    if (toggleSfxBtn) {
-      toggleSfxBtn.addEventListener('click', () => {
-        sfxEnabled = !(toggleSfxBtn.getAttribute('aria-pressed') === 'true');
-        updateSfxToggleUI(sfxEnabled);
-        // give a tiny confirm ping when turning on
-        if (sfxEnabled) beep(520, 70, 'square', 0.03);
-      });
-    }
+    // (removed) start-menu toggle event handlers; speaker buttons handle muting now
     if (restartBtn) {
       restartBtn.addEventListener('click', () => {
         hideGameOverMenu();
