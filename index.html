@@ -751,6 +751,8 @@
   let towerImg = null;
   const TOWER_SCALE = 8.0;      // 4x bigger than previous (was 2.0)
   const TOWER_PARALLAX = 0.6;   // unused for pixel-anchored tower
+  // Score at which the tower fully disappears into the bottom edge
+  const TOWER_HIDE_SCORE = 4000;
 
     // -------- difficulty (static) --------
   let MAX_CLOUD_SPACING = 150;
@@ -1431,26 +1433,20 @@
       // Draw static sky background covering the entire canvas
       drawScrollingSky();
 
-      // Draw background tower in pixel space, anchored to canvas bottom and behind ground.
-  // Lower it progressively as score increases; fully disappears into bottom around score 10000.
+      // Draw background tower in pixel space (single tall sprite), anchored to canvas bottom and behind ground.
+      // Lower it progressively as score increases; fully disappears into bottom at TOWER_HIDE_SCORE.
       if (towerImg) {
         ctx.save();
         const tw = Math.round(towerImg.width * TOWER_SCALE);
         const th = Math.round(towerImg.height * TOWER_SCALE);
         const tx = Math.round((canvas.width - tw) / 2);
-  // Progress: 0 -> 1 as score goes 0 -> 10000
-  const p = Math.max(0, Math.min(1, (score || 0) / 10000));
-        // Draw a finite stack of tiles so the tower can fully disappear into the bottom at p=1
-  const overlap = 1; // pixels of overlap to avoid visible seams between tiles
-        const step = Math.max(1, th - overlap);
-        const nTiles = Math.ceil((canvas.height + th) / step) + 1;
-        const offsetDown = p * (nTiles * th);
+        // Progress: 0 -> 1 as score goes 0 -> TOWER_HIDE_SCORE
+        const p = Math.max(0, Math.min(1, (score || 0) / TOWER_HIDE_SCORE));
+        // Move downward by up to exactly one full tower height so it slides out through the bottom
+        const offsetDown = Math.round(p * th);
+        const y = Math.round(canvas.height - th + offsetDown);
         ctx.globalAlpha = 0.25; // 25% opacity
-        const baseTop = Math.round(canvas.height - th + offsetDown);
-        for (let i = 0; i < nTiles; i++) {
-          const y = Math.round(baseTop - i * step);
-          if (y >= canvas.height) continue;      // fully below the canvas
-          if (y + th <= 0) break;                // fully above the canvas; remaining tiles are above too
+        if (y < canvas.height) {
           ctx.drawImage(towerImg, 0, 0, towerImg.width, towerImg.height, tx, y, tw, th);
         }
         ctx.globalAlpha = 1;
