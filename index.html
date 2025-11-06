@@ -771,7 +771,7 @@
   // milestone: trigger a brief effect on the main HUD score every 1000 points
   let nextMilestone = 1000;
   let scoreEffectTime = 0; // ms remaining for HUD score effect
-  const SCORE_EFFECT_DURATION = 600; // ms
+  const SCORE_EFFECT_DURATION = 1200; // ms
 
     // restart cooldown (ms)
     let restartCooldown = 0;
@@ -1414,16 +1414,25 @@
       const scoreText = String(Math.floor(score));
       // Base score draw
       drawTextWithLetterSpacing(ctx, scoreText, margin, margin, spacingPx);
-      // Overlay effect on milestone: rise slightly, scale up, and fade out over time
+      // Overlay effect on milestone: position at bottom-right of main score, scale up, and fade out over time
       if (scoreEffectTime > 0) {
         const p = scoreEffectTime / SCORE_EFFECT_DURATION; // 1 -> 0
-        const scale = 1 + 0.35 * p; // up to +35% scale
-        const yLift = 10 * p; // rise up to 10px
+        const scale = 1 + 0.70 * p; // doubled effect: up to +70% scale
+        const xShift = 10 * p; // nudge to the right up to 10px
+        const yShift = 10 * p; // drop down up to 10px
+        // compute text width with letter spacing to anchor at bottom-right of the base score
+        let w = 0;
+        for (let i = 0; i < scoreText.length; i++) {
+          const ch = scoreText[i];
+          w += Math.round(ctx.measureText(ch).width + spacingPx);
+        }
         ctx.save();
         ctx.globalAlpha = 0.55 * p; // fade out
-        ctx.translate(margin, margin - yLift);
+        // translate to bottom-right corner of the base score, plus a small bottom-right shift
+        ctx.translate(margin + w + xShift, margin + fontPx + yShift);
         ctx.scale(scale, scale);
-        drawTextWithLetterSpacing(ctx, scoreText, 0, 0, spacingPx);
+        // draw anchored so that (-w, -fontPx) is the top-left of the text box
+        drawTextWithLetterSpacing(ctx, scoreText, -w, -fontPx, spacingPx);
         ctx.restore();
       }
 
