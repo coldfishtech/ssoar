@@ -752,7 +752,7 @@
     // -------- background tower --------
   const TOWER_SRC = 'resources/tower/tower.png';
   let towerImg = null;
-  const TOWER_SCALE = 8.0;      // 4x bigger than previous (was 2.0)
+  // Draw at native resolution; no runtime scaling
   const TOWER_PARALLAX = 0.6;   // unused for pixel-anchored tower
   // Score at which the tower fully disappears into the bottom edge
   const TOWER_HIDE_SCORE = 12000;
@@ -1549,8 +1549,8 @@
       // Lower it progressively as score increases; fully disappears into bottom at TOWER_HIDE_SCORE.
       if (towerImg) {
         ctx.save();
-        const tw = Math.round(towerImg.width * TOWER_SCALE);
-        const th = Math.round(towerImg.height * TOWER_SCALE);
+        const tw = towerImg.width;  // native width
+        const th = towerImg.height; // native height
         const tx = Math.round((canvas.width - tw) / 2);
         // Progress: 0 -> 1 as score goes 0 -> TOWER_HIDE_SCORE
         const p = Math.max(0, Math.min(1, (score || 0) / TOWER_HIDE_SCORE));
