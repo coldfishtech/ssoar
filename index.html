@@ -1558,9 +1558,13 @@
         const offsetDown = Math.round(p * th);
         const y = Math.round(canvas.height - th + offsetDown);
         ctx.globalAlpha = 0.25; // 25% opacity
+        // Subtle distance blur for the background tower only
+        ctx.filter = 'blur(3px)';
         if (y < canvas.height) {
           ctx.drawImage(towerImg, 0, 0, towerImg.width, towerImg.height, tx, y, tw, th);
         }
+        // Reset draw state
+        ctx.filter = 'none';
         ctx.globalAlpha = 1;
         ctx.restore();
       }
